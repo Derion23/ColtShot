@@ -1,0 +1,17 @@
+INFO ZU MEINEN PROGRAMMEN:
+- Ich habe z.B. um festzustellen ob der Drehknopf gedrückt wurde einfach im loop() den Status des digial Pins abgefragt. Besser wäre es wahrscheinlich dies über ein interrupt zu machen, da der Knopfdruck dann auch registriert werden würde, 
+  falls der Arduino sich grad mit anderen Code-Zeilen beschäftigt.
+
+
+INFO ZUM ARDUINO:
+
+- falls man die libraries LCDWIKI_GUI oder LCDWIKI_KBV benutzen will muss man auf der gleichen Ebene wie das arduino Programm einen Ordner erstellen, der "libraries" heißt. 
+  In diesen Ordner kopiert man dann die Ordner für die LCDWIKI Dateien. Die Ordner für die LCDWIKI Dateien sind in den Ordnern von zwei der von mir hochgeladenen Arduino Programme.
+  
+- Falls man ein neues Programm auf den Arduino hochladen will:
+    1) unter file->preferences gucken ob die "scetchbook location" auf den Pfad des Ordners des Programms enthält, in dem der Arduino Code und gegebenenfalls auch der "libraries" Ordner sind.
+       Falls nicht, auf browse drücken und die "scetchbook location" ändern
+    2) Arduino IDE muss arduino erkennen, oben links müsste Arduino Mega stehen
+    3) Oben rechts kann man den Serial Monitor öffnen, hier sieht man den Output von Serial.print()
+    4) Oben links auf den Upload Button "->" drücken
+    
