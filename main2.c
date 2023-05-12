@@ -9,10 +9,11 @@ int nEnteredRecipes = 0;
 char ingredients[][30] = {"Sprite", "Vodka", "OSaft", "Rum", "Sirup", "Cola", "A-Saft", "Kiba", "Bier", "Wein", "wtfkommtincocktailsrein"};
 char containerContents[nContainer][30] = {"Sprite", "Orangensaft", "Vodka", "Rum", "Sirup", "Cola"};
 
-//arduino vars
+//arduino varsss
 int potprev;
 int potval;
 int potdelta;
+int test;
 //ende
 
 int menustate; /*
