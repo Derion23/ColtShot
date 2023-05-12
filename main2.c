@@ -14,6 +14,7 @@ int potprev;
 int potval;
 int potdelta;
 int test;
+int testt;
 //ende
 
 int menustate; /*
