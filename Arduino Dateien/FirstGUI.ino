@@ -12,6 +12,10 @@ const int focusedCircleRadius = 8;
 const int choiceSpacingY = 25;
 const int correctionCirclePosY = 3;
 
+const String supportedIngredients[] = {"Sprudelwasser", "Whiskey", "Limettensaft", "Tequila", "Orangensaft", "Gin", "Vodka", "Rum", "Cola", "TonicWater", "OrangenLikör", "Sirup", "Martini", "Cachaca", "GrenadineSirup"};
+const String supportedCocktails[] = {"Gin Tonic", "Margaritha", "Cuba Libre", "Daiquiri", "Vodka Gimlet", "Martini Cola", "Mojito", "Caipirinha", "Tequila Sunrise"};
+
+
 // GLOBAL VARIABLES
 String state = "start";
 
@@ -33,7 +37,7 @@ int previousCklState;
 
 // Variables to prevent counter from bouncing, jumping
 long timeOfLastDebounce = 0;
-int delayOfDebounce = 250;
+int delayOfDebounce = 200;
 
 
 // DEFINITIONS
@@ -108,18 +112,38 @@ void start(){
 }
 
 void addCocktails(){
+  resetGlobalVariables();
+  numOfChoices = 8;
   mylcd.Fill_Screen(BLACK);
-  print("addCocktails");
-  while(true){
+  print("Waehle eine der folgenden Cocktails aus:");
+  print("");
+  
+  for(int i = 0; i < 8; i++){
+    printChoice(supportedCocktails[i]);
+  }
 
+  turningAllowed = true;
+  while(true){
+    focusedChoice = getTurnKnobIndex();
+    focus();
   }
 }
 
 void addIngredients(){
+  resetGlobalVariables();
+  numOfChoices = 10;
   mylcd.Fill_Screen(BLACK);
-  print("addIngredients");
-  while(true){
+  print("Waehle eine der folgenden Zutaten aus:");
+  print("");
+  
+  for(int i = 0; i < 10; i++){
+    printChoice(supportedIngredients[i]);
+  }
 
+  turningAllowed = true;
+  while(true){
+    focusedChoice = getTurnKnobIndex();
+    focus();
   }
 }
 
