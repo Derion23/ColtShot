@@ -70,8 +70,14 @@ int getTurnKnobIndex(){
       counter--;												// |
     }														// |
     Serial.println(counter);											// |
-  }*/														// L--> unnecessary, can be deleted
-  counter += dequeueInput()*(counter < numOfChoices-1 && counter > 0);			// bools können in c als ints verwendet werden
+  }*/														// L--> unnecessary, just for reference
+  int temp = dequeueInput();
+  if (temp > 0 && counter < numOfChoices-1){
+	  counter++;
+  }
+  else if(temp < 0 && counter > 0){
+	  counter--;
+  }
   Serial.println(counter);
   // update previousCklState
   //previousCklState = clkState; 											//unnecessary
