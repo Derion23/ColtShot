@@ -5,7 +5,7 @@ int inputQueuePoint = 0; //pointer auf das aktuell erste freie inputQueue[] Elem
 attachInterrupt(digitalPinToInterrupt(pinBTN), buttonPressINT, FALLING); //wenn pinBTN -> LOW => Button pressed
 
 void buttonPressINT(){
-	if (inputQueuePoint+1 > queuesize){				//check if queue is full
+	if (inputQueuePoint+1 >= queuesize){				//check if queue is full
 		Serial.println("inputQueue overflow!");
 		return;
 	}
@@ -16,7 +16,7 @@ void buttonPressINT(){
 attachInterrupt(digitalPinToInterrupt(pinCLK), knobTurnINT, CHANGE); //pinCLK ändert zustand (evtl fällt, steigt?), wenn knob gedreht?
 
 void knobTurnINT(){
-	if (inputQueuePoint+1 > queuesize){				//check if queue is full
+	if (inputQueuePoint+1 >= queuesize){				//check if queue is full
 		Serial.println("inputQueue overflow!");
 		return;
 	}
@@ -48,4 +48,32 @@ int dequeueInput(){
 	inputQueue[queuesize-1] = 0;
 	inputQueuePoint--;
 	return out;
+}
+
+int getTurnKnobIndex(){
+  // Check if turning is allowed
+  if(!turningAllowed) return 0;
+  if (inputQueue[0] == 2){						// falls erster Input ein buttonpress war
+  	return 0;
+  }
+
+  /*int clkState = digitalRead(pinCLK);										// |
+  int dtState = digitalRead(pinDT);										// |
+														// |
+  // check if enough time has passed and if rotation occured							// |
+  if((millis() - timeOfLastDebounce) > delayOfDebounce && clkState != previousCklState){			// |
+    timeOfLastDebounce = millis();										// |
+														// |
+    if(dtState != clkState && counter < numOfChoices - 1){							// |
+      counter++;												// |
+    } else if(dtState == clkState && counter > 0){								// |
+      counter--;												// |
+    }														// |
+    Serial.println(counter);											// |
+  }*/														// L--> unnecessary, can be deleted
+  counter += dequeueInput()*(counter < numOfChoices-1 && counter > 0);			// bools können in c als ints verwendet werden
+  Serial.println(counter);
+  // update previousCklState
+  //previousCklState = clkState; 											//unnecessary
+  return counter;
 }
