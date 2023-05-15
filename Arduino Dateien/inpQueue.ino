@@ -1,4 +1,4 @@
-int queuesize = 10; //nur in dequeueInput() und INTs verwendet, kann statisch eingetragen werden (ohne variable)
+int queuesize = 10;
 int inputQueue[queuesize];
 int inputQueuePoint = 0; //pointer auf das aktuell erste freie inputQueue[] Element (kein Hardware-pointer!! ;P)
 
@@ -50,6 +50,11 @@ int dequeueInput(){
 	return out;
 }
 
+void flushInputQueue(){							// empties queue
+	for (int i = 0; i < queuesize; i++){
+		inputQueue[i] = 0;
+	}
+}
 int getTurnKnobIndex(){
   // Check if turning is allowed
   if(!turningAllowed) return 0;
