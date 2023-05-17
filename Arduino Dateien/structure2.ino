@@ -1,4 +1,21 @@
- #define nTanks 6
+/* classlist:
+  Ingredient{name, amount}
+   set/getName()
+   set/getAmount()
+  Cocktail{name, Ingredient[]}
+   addIngredient()
+   printCocktail()           - uses print() to print a showable Recipe
+  Tank{contentName, amount}
+   setIngredient()
+   getContent()
+   fillTo()
+   withdraw()
+  ColtShot{filledTanks, Tank[]}
+   addContent()
+   emptyTanks()
+   printTanks()
+*/
+#define nTanks 6
 // print definiert
 
 void print(String a){} //nur zum testkompilieren
