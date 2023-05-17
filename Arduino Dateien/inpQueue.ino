@@ -1,3 +1,7 @@
+/*
+getTurnKnobIndex() -> increases/decreases menucounter according to turn
+int inputState -> interrupt-based state of last input, can be read out from anywhere in the code
+*/
 
 int inputState; //0: kein Input, 1: knobTurn forward, -1: knobTurn backwards, 2: BTNPress (maybe 0-3 -> unsigned word, weniger Speicheplatz)
 
