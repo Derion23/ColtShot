@@ -1,7 +1,7 @@
  #define nTanks 6
 // print definiert
 
-void print(String a){}
+void print(String a){} //nur zum testkompilieren
 
 class Ingredient{
 private:
