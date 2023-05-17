@@ -3,6 +3,7 @@
    set/getName()
    set/getAmount()
   Cocktail{name, Ingredient[]}
+   setName()
    addIngredient()
    printCocktail()           - uses print() to print a showable Recipe
   Tank{contentName, amount}
