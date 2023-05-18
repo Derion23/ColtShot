@@ -162,5 +162,31 @@ void helpHerunterladen(struct List * &list, String name){
   }
 }
 
+void searchByIngredient(class Cocktail *&cocktail, struct List* &newlist, String IngredientName){
+  bool state = false;
+  if(cocktail == nullptr){ return; }
+  for(int i=0;i<nTanks;i++){
+    String ingredient= cocktail->getIngredient(i).getName();
+    state = IngredientName.equals(ingredient);
+    
+    //Wenn gleich, wird state true sein.
+  }
+  if(state == true){
+    searchHelp(cocktail,newlist);
+  }
+  searchByIngredient(cocktail->next, newlist, IngredientName);
+}
+
+void searchHelp(class Cocktail * &cocktail, struct List* &list){
+  if(list->front==nullptr){
+    list->front = cocktail;
+    list->back = cocktail;
+    cocktail->next=nullptr;
+  }else{
+    list->back->next= cocktail;
+    list->back=cocktail;
+    cocktail->next=nullptr;
+  }
+}
 
 
