@@ -19,6 +19,7 @@ const String supportedCocktails[] = {"Gin Tonic", "Margaritha", "Cuba Libre", "D
 // GLOBAL VARIABLES
 String state = "start";
 
+// maybe use instead of integers bytes for saving storage
 int textPosY;
 int startOfChoicesY;
 bool turningAllowed;      // turning of knob allowed?
@@ -28,12 +29,13 @@ int numOfChoices;
 
 
 // DREHKNOPF
-int pinDT = 43;
-int pinCLK = 45;
-int pinBTN = 41;
+int pinDT = 20;
+int pinCLK = 21;
+int pinBTN = 19;
 
 int counter = 0;
-int previousCklState;
+int inputState; //0: kein Input, 1: knobTurn forward, -1: knobTurn backwards, 2: BTNPress (maybe 0-3 -> unsigned word, weniger Speicheplatz)
+int previousClkState;
 
 // Variables to prevent counter from bouncing, jumping
 long timeOfLastDebounce = 0;
@@ -60,7 +62,10 @@ void setup() {
   pinMode(pinDT, INPUT_PULLUP);
   pinMode(pinCLK, INPUT_PULLUP);
   pinMode(pinBTN, INPUT_PULLUP);
-  previousCklState = digitalRead(pinCLK);
+  previousClkState = digitalRead(pinCLK);
+  // INTERRUPTS, possiblw Interrupt PINS: 2, 3, 18, 19, 20, 21
+  attachInterrupt(digitalPinToInterrupt(pinBTN), buttonPress, FALLING); // if pinBTN HIGH -> LOW => Button pressed
+  attachInterrupt(digitalPinToInterrupt(pinCLK), knobTurn, CHANGE); // if clk Pin Changes
 
   // setUp of Screen
   mylcd.Set_Text_Mode(0);
@@ -89,6 +94,7 @@ void loop() {
 void start(){
   resetGlobalVariables();
   numOfChoices = 2;
+  mylcd.Fill_Screen(BLACK);
 
   print("Waehle eine der folgenden Moeglich-");
   print("keiten die Maschine zu befuellen:");
@@ -156,6 +162,31 @@ void end(){
 }
 
 
+// INTERRUPT FUNCTIONS
+void buttonPress(){
+  inputState = 2;
+  Serial.println("Button: pressed");
+}
+
+void knobTurn(){
+  int clkState = digitalRead(pinCLK);
+  int dtState = digitalRead(pinDT);
+
+  // check if enough time has passed and if rotation occured
+  if((millis() - timeOfLastDebounce) > delayOfDebounce){
+      timeOfLastDebounce = millis();
+
+      if(dtState != clkState){          
+          inputState = 1;
+          Serial.println("Knob: positive rotation");
+      } else if(dtState == clkState){
+          inputState = -1;     
+          Serial.println("Knob: negative rotation");
+      }
+    }
+}
+
+
 // HELPER FUCTIONS
 void print(String message){
   mylcd.Print_String(message, textPaddingX, textPosY);
@@ -192,29 +223,24 @@ int getTurnKnobIndex(){
   // Check if turning is allowed
   if(!turningAllowed) return 0;
 
-  int clkState = digitalRead(pinCLK);
-  int dtState = digitalRead(pinDT);
-
-  // check if enough time has passed and if rotation occured
-  if((millis() - timeOfLastDebounce) > delayOfDebounce && clkState != previousCklState){
-    timeOfLastDebounce = millis();
-
-    if(dtState != clkState && counter < numOfChoices - 1){
-      counter++;
-    } else if(dtState == clkState && counter > 0){
-      counter--;
-    }
+  if (counter < numOfChoices-1 && inputState == 1){
+    counter++;
     Serial.println(counter);
+    inputState = 0;
+  }
+  else if (counter > 0 && inputState == -1){
+    counter --;
+    Serial.println(counter);
+    inputState = 0;
   }
 
-  // update previousCklState
-  previousCklState = clkState;
   return counter;
 }
 
 bool isButtonPressed(){
   // check if button is pressed, maybe implement a short block time after the button was pressed
-  if(digitalRead(pinBTN) == LOW){
+  if(inputState == 2){
+    inputState = 0;
     Serial.println("Button pressed");
     return true;
   }
@@ -227,6 +253,7 @@ void resetGlobalVariables(){
   turningAllowed = false;      // Drehen des Drehknopfes erlaubt?
   lastFocusedChoice = -1;
   focusedChoice = 0;
+  counter = 0;
 }
 
 
