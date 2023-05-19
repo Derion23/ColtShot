@@ -4,6 +4,7 @@
 #define nTanks 6
 
 File Rezept;
+File Tanks;
 
 void print(String a){}
 
@@ -101,14 +102,23 @@ class ColtShot{
   private:
     int filledTanks = 0;
   public:
+    ColtShot(){}
     Tank tanks[nTanks];
-    Coltshot(){
-    }
     int addContent(String ing){
+      if(filledTanks>=nTanks) return 1;
       tanks[filledTanks].setIngredient(ing);
       filledTanks++;
       return 0;
     }
+
+    int addContent(String ing, int level){
+      if(filledTanks>=nTanks) return 1;
+      tanks[filledTanks].setIngredient(ing);
+      tanks[filledTanks].fillTo(level);
+      filledTanks++;
+      return 0;
+    }
+
     int emptyTanks(){
       for (int i = 0; i < nTanks; i++){
         tanks[i].fillTo(0);
@@ -123,6 +133,10 @@ class ColtShot{
         print("Content: " + tanks[i].getContent() + ", Amount: " + char(tanks[i].getAmount()) + "cl");
       }
     }
+
+    String getTankContent(int index){ return tanks[index].getContent();}
+
+    char getTankFillingLevel(int index){ return char(tanks[index].getAmount()); }
   };
 
 
@@ -150,14 +164,15 @@ void RezeptHerunterladen(struct List * &list){
 
   while(Rezept.available()){
     c=Rezept.read();
-    if(c=="\""){
-      name = Serial.readStringUntil("\"");
+    if(c=='\"'){
+      name = Serial.readStringUntil('\"');
       helpHerunterladen(list,name);
     }
-    if(c=="("){ name2 = Serial.readStringUntil(","); }
+    if(c=='('){ name2 = Serial.readStringUntil(','); }
     if('0'<=c && '9'>=c){ amount = c-'0';}
     list->back->addIngredient(name2, amount);
   }
+  Rezept.close();
 }
 
 void helpHerunterladen(struct List * &list, String name){
@@ -197,4 +212,33 @@ void searchHelp(class Cocktail * &cocktail, struct List* &list){
     list->back=cocktail;
     cocktail->next=nullptr;
   }
+}
+
+//Format: *ContentName:fillLevel\n*ContentName:fillLevel\n...
+void TanksHerunterladen(class ColtShot &coltshot){
+  Tanks = SD.open("tanks.txt");
+  char c;
+  String name;
+  int fillinglevel;
+  while(Tanks.available()){
+    c=Tanks.read();
+    if(c=='*'){  name = Serial.readStringUntil(':');  }
+    if('0'<=c && '9'>=c){ fillinglevel = c-'0';}
+    coltshot.addContent(name,fillinglevel);
+  }
+  Tanks.close();
+}
+
+void TanksHochladen(class ColtShot &coltshot){
+
+    SD.remove("tanks.txt");
+  Tanks = SD.open("tanks.txt");
+  for(int i=0;i<nTanks;i++){
+    Tanks.print('*');
+    Tanks.print(coltshot.getTankContent(i));
+    Tanks.print(':');
+    Tanks.println(coltshot.getTankFillingLevel(i));
+  }
+  Tanks.close();
+
 }
