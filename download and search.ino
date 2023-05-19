@@ -64,6 +64,17 @@ struct List{
     front = nullptr;
     back = nullptr;
   }
+
+  ~List(){
+    Cocktail* &current = front;
+    while (current != nullptr) {
+      Cocktail* &next = current->next;
+      delete current;
+      current = next;
+    }
+    front = nullptr;
+    back = nullptr;
+  }
 };
 
 class Tank{
@@ -139,11 +150,11 @@ void RezeptHerunterladen(struct List * &list){
 
   while(Rezept.available()){
     c=Rezept.read();
-    if(c="\""){
+    if(c=="\""){
       name = Serial.readStringUntil("\"");
       helpHerunterladen(list,name);
     }
-    if(c="("){ name2 = Serial.readStringUntil(","); }
+    if(c=="("){ name2 = Serial.readStringUntil(","); }
     if('0'<=c && '9'>=c){ amount = c-'0';}
     list->back->addIngredient(name2, amount);
   }
@@ -168,7 +179,6 @@ void searchByIngredient(class Cocktail *&cocktail, struct List* &newlist, String
   for(int i=0;i<nTanks;i++){
     String ingredient= cocktail->getIngredient(i).getName();
     state = IngredientName.equals(ingredient);
-    
     //Wenn gleich, wird state true sein.
   }
   if(state == true){
@@ -188,5 +198,3 @@ void searchHelp(class Cocktail * &cocktail, struct List* &list){
     cocktail->next=nullptr;
   }
 }
-
-
