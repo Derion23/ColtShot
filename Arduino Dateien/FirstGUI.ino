@@ -18,6 +18,8 @@ const String supportedCocktails[] = {"Gin Tonic", "Margaritha", "Cuba Libre", "D
 
 // GLOBAL VARIABLES
 String state = "start";
+String lastState;
+String secondLastState;
 
 // maybe use instead of integers bytes for saving storage
 int textPosY;
@@ -31,10 +33,11 @@ int numOfChoices;
 // DREHKNOPF
 int pinDT = 20;
 int pinCLK = 21;
-int pinBTN = 19;
+int pinOkBTN = 19;
+int pinBackBTN = 18;
 
 int counter = 0;
-int inputState; //0: kein Input, 1: knobTurn forward, -1: knobTurn backwards, 2: BTNPress (maybe 0-3 -> unsigned word, weniger Speicheplatz)
+int inputState; //0: kein Input, 1: knobTurn forward, -1: knobTurn backwards, 2: OkBTNPress, 3: BackBTNPress (maybe 0-3 -> unsigned word, weniger Speicheplatz)
 int previousClkState;
 
 // Variables to prevent counter from bouncing, jumping
@@ -61,10 +64,11 @@ void setup() {
   // setup Drehknopf
   pinMode(pinDT, INPUT_PULLUP);
   pinMode(pinCLK, INPUT_PULLUP);
-  pinMode(pinBTN, INPUT_PULLUP);
+  pinMode(pinOkBTN, INPUT_PULLUP);
   previousClkState = digitalRead(pinCLK);
   // INTERRUPTS, possiblw Interrupt PINS: 2, 3, 18, 19, 20, 21
-  attachInterrupt(digitalPinToInterrupt(pinBTN), buttonPress, FALLING); // if pinBTN HIGH -> LOW => Button pressed
+  attachInterrupt(digitalPinToInterrupt(pinOkBTN), okButtonPress, FALLING); // if pinOkBTN HIGH -> LOW => Button pressed
+  attachInterrupt(digitalPinToInterrupt(pinBackBTN), backButtonPress, FALLING); // if back btn was pressed
   attachInterrupt(digitalPinToInterrupt(pinCLK), knobTurn, CHANGE); // if clk Pin Changes
 
   // setUp of Screen
@@ -85,6 +89,8 @@ void loop() {
     addCocktails();
   else if(state == "addIngredients")
     addIngredients();
+  else if(state == "confirmGoingBack")
+    confirmGoingBack();
   else if(state == "end")
     end();
 }
@@ -93,8 +99,9 @@ void loop() {
 // MENU FUNCTIONS 
 void start(){
   resetGlobalVariables();
-  numOfChoices = 2;
   mylcd.Fill_Screen(BLACK);
+
+  numOfChoices = 2;
 
   print("Waehle eine der folgenden Moeglich-");
   print("keiten die Maschine zu befuellen:");
@@ -106,7 +113,7 @@ void start(){
     focusedChoice = getTurnKnobIndex();
     focus();
 
-    if(isButtonPressed()){
+    if(isOkButtonPressed()){
       if(focusedChoice == 0)
         state = "addCocktails";
       else if(focusedChoice == 1)
@@ -119,8 +126,10 @@ void start(){
 
 void addCocktails(){
   resetGlobalVariables();
-  numOfChoices = 8;
   mylcd.Fill_Screen(BLACK);
+
+  numOfChoices = 8;
+
   print("Waehle eine der folgenden Cocktails aus:");
   print("");
   
@@ -132,13 +141,22 @@ void addCocktails(){
   while(true){
     focusedChoice = getTurnKnobIndex();
     focus();
+
+    if(isBackButtonPressed()){
+      lastState = "addCocktails";
+      secondLastState = "start";
+      state = "confirmGoingBack";
+      return;
+    }
   }
 }
 
 void addIngredients(){
   resetGlobalVariables();
-  numOfChoices = 10;
   mylcd.Fill_Screen(BLACK);
+
+  numOfChoices = 10;
+
   print("Waehle eine der folgenden Zutaten aus:");
   print("");
   
@@ -150,8 +168,44 @@ void addIngredients(){
   while(true){
     focusedChoice = getTurnKnobIndex();
     focus();
+
+    if(isBackButtonPressed()){
+      lastState = "addIngredients";
+      secondLastState = "start";
+      state = "confirmGoingBack";
+      return;
+    }
   }
 }
+
+void confirmGoingBack(){
+  resetGlobalVariables();
+  mylcd.Fill_Screen(BLACK);
+
+  numOfChoices = 2;
+
+  print("Wirklich zurueckgehen?");
+  print("");
+  printChoice("Abbrechen");
+  printChoice("Ja, zurueckgehen");
+
+  turningAllowed = true;
+  while(true){
+    focusedChoice = getTurnKnobIndex();
+    focus();
+
+    if(isOkButtonPressed()){
+      if(focusedChoice == 0){
+        state = lastState;
+      } else if(focusedChoice == 1){
+        state = secondLastState;
+      }
+
+      return;
+    }
+  }
+}
+
 
 void end(){
   mylcd.Fill_Screen(BLACK);
@@ -163,9 +217,14 @@ void end(){
 
 
 // INTERRUPT FUNCTIONS
-void buttonPress(){
+void okButtonPress(){
   inputState = 2;
-  Serial.println("Button: pressed");
+  Serial.println("OK-Button: pressed");
+}
+
+void backButtonPress(){
+  inputState = 3;
+  Serial.println("Back-Button: pressed");
 }
 
 void knobTurn(){
@@ -237,11 +296,19 @@ int getTurnKnobIndex(){
   return counter;
 }
 
-bool isButtonPressed(){
-  // check if button is pressed, maybe implement a short block time after the button was pressed
+bool isOkButtonPressed(){
+  // check if Ok-Button is pressed, maybe implement a short block time after the button was pressed
   if(inputState == 2){
     inputState = 0;
-    Serial.println("Button pressed");
+    return true;
+  }
+  return false;
+}
+
+bool isBackButtonPressed(){
+  // check if Back-Button is pressed, maybe implement a short block time after the button was pressed
+  if(inputState == 3){
+    inputState = 0;
     return true;
   }
   return false;
