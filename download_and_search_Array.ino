@@ -1,8 +1,8 @@
 #include <SD.h>
 #include <SPI.h>
-#define SDpin 10
+#define SDpin 53
 #define nTanks 6
-#define nCocktails 60
+#define nCocktails 3 
 
 File Rezept;
 File Tanks;
@@ -58,6 +58,13 @@ class Cocktail{
       }
     }
     Ingredient getIngredient(int a){ return ingredients[a]; }
+
+  void TestPrint(){
+    Serial.print(this->name);
+    for (int i = 0; i < nTanks; i++){
+      Serial.print(" ->" + String(this->ingredients[i].getAmount())+"cl of " + String(this->ingredients[i].getName()));
+    }
+  }
 
 };
 
@@ -131,34 +138,50 @@ void setup(){
     Serial.println("Initialisierung erfolgt nicht.");
     return;
   }
-  Serial.println("Initialisierung erfolgt.");
+  Serial.println("Initialisierung erfolgt.");  
+  
+  RezeptHerunterladen(cocktails);
+  cocktails[0].TestPrint();
+  cocktails[1].TestPrint();
+  cocktails[2].TestPrint();
 }
 void loop(){
-  RezeptHerunterladen(cocktails);
+
   
 }
 
-//Format: "Name"([(Zutat,Menge)],Eis);"Name"([(Zutat,Menge)],Eis);...
 void RezeptHerunterladen(class Cocktail cocktails[]){
-  Rezept = SD.open("Rezepte.txt");
-  char c;
-  String name;
-  String name2;
+  String name="";
+  String name2="";
   int amount;
-  int index = -1;
+  int index = 0;
 
-  while(Rezept.available()){
-    c=Rezept.read();
-    if(c=='\"'){
-      index++;
-      name = Serial.readStringUntil('\"');
+  Rezept = SD.open("testtext.txt");
+  for(index=0;index<nCocktails;index++){
+    while(Rezept.available()){
+      char c= Rezept.read();
+      //Serial.print(c);
+      if(c==',') break;
+      name+=c;    
+      }
+   
       cocktails[index].setName(name);
-    }
-    if(c=='('){ name2 = Serial.readStringUntil(','); }
-    if('0'<=c && '9'>=c){ amount = c-'0';}
-    cocktails[index].addIngredient(name2,amount);
-
-    if(index>=nCocktails){ return; }
+      name="";
+      for(int i=0;i<nTanks;i++){
+      while(Rezept.available()){
+        char c=Rezept.read();
+        if(c==',') break;
+        name2+=c;
+      }
+      while(Rezept.available()){
+        char c=Rezept.read();
+        if (c==',') break;
+        amount = c-'0';
+      }
+      cocktails[index].addIngredient(name2,amount);
+      name2="";
+      amount=0;
+      }
   }
   Rezept.close();
 }
@@ -177,6 +200,8 @@ void SearchByName(Cocktail cocktails[], String SearchingName, int ResultArray[])
     }
   }
 }
+
+
 
 
 //Format: *ContentName:fillLevel\n*ContentName:fillLevel\n...
