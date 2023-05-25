@@ -207,14 +207,21 @@ void SearchByName(Cocktail cocktails[], String SearchingName, int ResultArray[])
 //Format: *ContentName:fillLevel\n*ContentName:fillLevel\n...
 void TanksHerunterladen(class ColtShot &coltshot){
   Tanks = SD.open("tanks.txt");
-  char c;
-  String name;
-  int fillinglevel;
-  while(Tanks.available()){
-    c=Tanks.read();
-    if(c=='*'){  name = Serial.readStringUntil(':');  }
-    if('0'<=c && '9'>=c){ fillinglevel = c-'0';}
+  String name="";
+  int fillinglevel=0;
+  for(int i=0;i<nTanks;i++){
+    while(Tanks.available()){
+      char c=Tanks.read();
+      if(c==',') break;
+      name += c;
+    }
+    while(Tanks.available()){
+      char c=Tanks.read();
+      if(c==',') break;
+      fillinglevel = c-'0';
+    }
     coltshot.addContent(name,fillinglevel);
+    
   }
   Tanks.close();
 }
