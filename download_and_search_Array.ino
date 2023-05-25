@@ -64,6 +64,7 @@ class Cocktail{
     for (int i = 0; i < nTanks; i++){
       Serial.print(" ->" + String(this->ingredients[i].getAmount())+"cl of " + String(this->ingredients[i].getName()));
     }
+    Serial.println("");
   }
 
 };
@@ -118,12 +119,20 @@ class ColtShot{
       return 1;
     }
 
-    int printTanks(){
+    void printTanks(){
       print("Tanks:");
       for (int i = 0; i < nTanks; i++){
         print("Content: " + tanks[i].getContent() + ", Amount: " + char(tanks[i].getAmount()) + "cl");
       }
     }
+    
+    void TestPrintTanks(){
+      print("Tanks:");
+      for (int i = 0; i < nTanks; i++){
+        Serial.println("Content: " + tanks[i].getContent() + ", Amount: " + String(tanks[i].getAmount()) + "cl");
+      }
+    }
+    
 
     String getTankContent(int index){ return tanks[index].getContent();}
 
@@ -131,7 +140,7 @@ class ColtShot{
   };
 
 Cocktail cocktails[nCocktails];
-
+ColtShot coltshot;
 void setup(){
   Serial.begin(9600);
   if(!SD.begin(SDpin)){
@@ -144,34 +153,43 @@ void setup(){
   cocktails[0].TestPrint();
   cocktails[1].TestPrint();
   cocktails[2].TestPrint();
+  Serial.println("");
+
+  TanksHerunterladen(coltshot);
+  coltshot.TestPrintTanks();
 }
 void loop(){
 
   
 }
 
+//Format: "Name"([(Zutat,Menge)],Eis);"Name"([(Zutat,Menge)],Eis);...
 void RezeptHerunterladen(class Cocktail cocktails[]){
   String name="";
   String name2="";
   int amount;
   int index = 0;
 
-  Rezept = SD.open("testtext.txt");
+  Rezept = SD.open("rezept.txt");
   for(index=0;index<nCocktails;index++){
     while(Rezept.available()){
       char c= Rezept.read();
       //Serial.print(c);
       if(c==',') break;
-      name+=c;    
+      if(c!='\n') name+=c;    
       }
-   
+    //Serial.println(name);
+    //while(true){
+      //char c= Rezept.read();
+      //if(c=='\n') break;
+      //name2 += c;
       cocktails[index].setName(name);
       name="";
       for(int i=0;i<nTanks;i++){
       while(Rezept.available()){
         char c=Rezept.read();
         if(c==',') break;
-        name2+=c;
+        if(c!='\n') name2+=c;
       }
       while(Rezept.available()){
         char c=Rezept.read();
@@ -182,6 +200,7 @@ void RezeptHerunterladen(class Cocktail cocktails[]){
       name2="";
       amount=0;
       }
+    //}
   }
   Rezept.close();
 }
@@ -213,7 +232,7 @@ void TanksHerunterladen(class ColtShot &coltshot){
     while(Tanks.available()){
       char c=Tanks.read();
       if(c==',') break;
-      name += c;
+      if(c!='\n') name += c;
     }
     while(Tanks.available()){
       char c=Tanks.read();
@@ -221,20 +240,21 @@ void TanksHerunterladen(class ColtShot &coltshot){
       fillinglevel = c-'0';
     }
     coltshot.addContent(name,fillinglevel);
-    
+    name="";
   }
   Tanks.close();
 }
 
+
 void TanksHochladen(class ColtShot &coltshot){
 
-    SD.remove("tanks.txt");
+  SD.remove("tanks.txt");
   Tanks = SD.open("tanks.txt");
   for(int i=0;i<nTanks;i++){
-    Tanks.print('*');
     Tanks.print(coltshot.getTankContent(i));
-    Tanks.print(':');
-    Tanks.println(coltshot.getTankFillingLevel(i));
+    Tanks.print(',');
+    Tanks.print(coltshot.getTankFillingLevel(i));
+    Tanks.println(',');
   }
   Tanks.close();
 
