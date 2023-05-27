@@ -11,8 +11,10 @@ const int choiceRadioButtonRadius = 10;
 const int focusedCircleRadius = 8;
 const int choiceSpacingY = 25;
 const int correctionCirclePosY = 3;
+const int choiceMaxPosY = 280;
+const int maxNumOfPages = 5;
 
-const String supportedIngredients[] = {"Sprudelwasser", "Whiskey", "Limettensaft", "Tequila", "Orangensaft", "Gin", "Vodka", "Rum", "Cola", "TonicWater", "OrangenLikör", "Sirup", "Martini", "Cachaca", "GrenadineSirup"};
+const String supportedIngredients[] = {"Sprudelwasser", "Whiskey", "Limettensaft", "Tequila", "Orangensaft", "Gin", "Vodka", "Rum", "Cola", "TonicWater", "OrangenLikoer", "Sirup", "Martini", "Cachaca", "GrenadineSirup"};
 const String supportedCocktails[] = {"Gin Tonic", "Margaritha", "Cuba Libre", "Daiquiri", "Vodka Gimlet", "Martini Cola", "Mojito", "Caipirinha", "Tequila Sunrise"};
 
 
@@ -24,11 +26,16 @@ String secondLastState;
 // maybe use instead of integers bytes for saving storage
 int textPosY;
 int startOfChoicesY;
-bool turningAllowed;      // turning of knob allowed?
 int lastFocusedChoice;
 int focusedChoice;
 int numOfChoices;
-
+int currentPage = 0;
+int numOfPages = 1;
+bool nextPageOptionPrinted = false;
+bool previousPageOptionPrinted = false;
+int numOfChoicesOnPage[maxNumOfPages - 1];
+int skippedChoices = 0; // numOfChoices which were not printed because the were on a previous page
+bool previousPageChoicesSkipped = false;
 
 // DREHKNOPF
 int pinDT = 20;
@@ -108,7 +115,6 @@ void start(){
   print("");
   printChoice("Cocktails auswaehlen");
   printChoice("Zutaten auswaehlen");
-  turningAllowed = true;
   while(true){
     focusedChoice = getTurnKnobIndex();
     focus();
@@ -134,10 +140,9 @@ void addCocktails(){
   print("");
   
   for(int i = 0; i < 8; i++){
-    printChoice(supportedCocktails[i]);
+    printChoiceToPages(supportedCocktails[i]);
   }
 
-  turningAllowed = true;
   while(true){
     focusedChoice = getTurnKnobIndex();
     focus();
@@ -155,19 +160,36 @@ void addIngredients(){
   resetGlobalVariables();
   mylcd.Fill_Screen(BLACK);
 
-  numOfChoices = 10;
-
   print("Waehle eine der folgenden Zutaten aus:");
   print("");
   
-  for(int i = 0; i < 10; i++){
-    printChoice(supportedIngredients[i]);
-  }
+  printChoicesAddIngredients();     // sets numOfChoices
 
-  turningAllowed = true;
   while(true){
     focusedChoice = getTurnKnobIndex();
     focus();
+
+    if(isOkButtonPressed()){
+      // last Choice
+      if(focusedChoice == numOfChoices - 1){
+        // next page option exists
+        if(currentPage < numOfPages - 1){
+          mylcd.Fill_Screen(BLACK);
+          int numOfPagesBuf = numOfPages;
+          int currentPageBuf = currentPage;
+          resetGlobalVariables();
+          numOfPages = numOfPagesBuf;
+          currentPage = currentPageBuf + 1; // went one page further
+          numOfChoicesOnPage[currentPage] = 0;
+
+          Serial.print("NUM OF CHOICES LAST PAGE: ");
+          Serial.println(numOfChoicesOnPage[currentPage - 1]);
+
+          printChoicesAddIngredients();
+        }
+      }
+      
+    }
 
     if(isBackButtonPressed()){
       lastState = "addIngredients";
@@ -189,7 +211,6 @@ void confirmGoingBack(){
   printChoice("Abbrechen");
   printChoice("Ja, zurueckgehen");
 
-  turningAllowed = true;
   while(true){
     focusedChoice = getTurnKnobIndex();
     focus();
@@ -247,6 +268,13 @@ void knobTurn(){
 
 
 // HELPER FUCTIONS
+
+void printChoicesAddIngredients(){
+  for(int i = 0; i < 15; i++){
+    printChoiceToPages(supportedIngredients[i]);
+  }
+}
+
 void print(String message){
   mylcd.Print_String(message, textPaddingX, textPosY);
   textPosY += textSpacingY;
@@ -257,7 +285,49 @@ void printChoice(String message){
   mylcd.Set_Draw_color(RED);
   mylcd.Print_String(message, 2 * textPaddingX + 2 * choiceRadioButtonRadius, textPosY);
   mylcd.Draw_Circle(textPaddingX + choiceRadioButtonRadius, textPosY + choiceRadioButtonRadius - correctionCirclePosY, choiceRadioButtonRadius);
+
+  Serial.print("TextPosY: ");
+  Serial.println(textPosY);
+
   textPosY += choiceSpacingY;
+}
+
+void printChoiceToPages(String message){
+  // print option to go to previous page
+  if(currentPage != 0 && !previousPageOptionPrinted){
+    printChoice("Vorherige Seite");
+    previousPageOptionPrinted = true;
+    return;
+  }
+
+  // Skip a choice if it was printed at a previous page
+  if(currentPage != 0  && !previousPageChoicesSkipped){
+    int skipped = skippedChoices + 1; // first Choice was skipped because of printing prev. Page option
+    for(int i = 0; i < currentPage; i++){
+      skipped -= numOfChoicesOnPage[i];
+      // skip choice because it was printed
+      if(skipped < 0){
+        skippedChoices++;
+        return;
+      }
+    }
+    previousPageChoicesSkipped = true;
+  }
+
+  // print option to go to next page
+  if(textPosY >= choiceMaxPosY){
+    if(nextPageOptionPrinted  || numOfPages == maxNumOfPages) return;
+
+    printChoice("Naechste Seite");
+    numOfPages++;
+    numOfChoices = currentPage == 0 ? numOfChoicesOnPage[currentPage] + 1 : numOfChoicesOnPage[currentPage] + 2;  // one more choice: additional prev. Page Option + next Page option
+    nextPageOptionPrinted = true;
+    return;
+  }
+
+  printChoice(message);
+  numOfChoicesOnPage[currentPage]++;
+  numOfChoices = currentPage == 0 ? numOfChoicesOnPage[currentPage] : numOfChoicesOnPage[currentPage] + 1;  // one more choice: additional prev. Page Option
 }
 
 void focus(){
@@ -279,9 +349,6 @@ void focus(){
 }
 
 int getTurnKnobIndex(){
-  // Check if turning is allowed
-  if(!turningAllowed) return 0;
-
   if (counter < numOfChoices-1 && inputState == 1){
     counter++;
     Serial.println(counter);
@@ -315,12 +382,23 @@ bool isBackButtonPressed(){
 }
 
 void resetGlobalVariables(){
+  resetGlobalPageVariables();
+
   textPosY = textPaddingY;
-  startOfChoicesY = 0;
-  turningAllowed = false;      // Drehen des Drehknopfes erlaubt?
+  startOfChoicesY = textPaddingY;
   lastFocusedChoice = -1;
   focusedChoice = 0;
   counter = 0;
+  numOfPages = 1;
+  currentPage = 0;
+  
+}
+
+void resetGlobalPageVariables(){
+  nextPageOptionPrinted = false;
+  previousPageOptionPrinted = false;
+  skippedChoices = 0;
+  previousPageChoicesSkipped = false;
 }
 
 
