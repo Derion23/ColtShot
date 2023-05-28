@@ -13,8 +13,10 @@ const int choiceSpacingY = 25;
 const int correctionCirclePosY = 3;
 const int choiceMaxPosY = 280;
 const int maxNumOfPages = 5;
+const int textChoiceSpacingY = 15;
 
-const String supportedIngredients[] = {"Sprudelwasser", "Whiskey", "Limettensaft", "Tequila", "Orangensaft", "Gin", "Vodka", "Rum", "Cola", "TonicWater", "OrangenLikoer", "Sirup", "Martini", "Cachaca", "GrenadineSirup"};
+const String supportedIngredients[] = {"Sprudelwasser", "Whiskey", "Limettensaft", "Tequila", "Orangensaft", "Gin", "Vodka", "Rum", "Cola", "TonicWater", "OrangenLikoer", "Sirup", "Martini", "Cachaca", "GrenadineSirup",
+"a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m", "n", "o", "p"};
 const String supportedCocktails[] = {"Gin Tonic", "Margaritha", "Cuba Libre", "Daiquiri", "Vodka Gimlet", "Martini Cola", "Mojito", "Caipirinha", "Tequila Sunrise"};
 
 
@@ -48,8 +50,10 @@ int inputState; //0: kein Input, 1: knobTurn forward, -1: knobTurn backwards, 2:
 int previousClkState;
 
 // Variables to prevent counter from bouncing, jumping
-long timeOfLastDebounce = 0;
-int delayOfDebounce = 200;
+long timeOfLastDebounceTurn = 0;
+int delayOfDebounceTurn = 200;
+long timeOfLastDebouncePress = 0;
+int delayOfDebouncePress = 750;
 
 
 // DEFINITIONS
@@ -112,7 +116,7 @@ void start(){
 
   print("Waehle eine der folgenden Moeglich-");
   print("keiten die Maschine zu befuellen:");
-  print("");
+  addSpacingY(textChoiceSpacingY);
   printChoice("Cocktails auswaehlen");
   printChoice("Zutaten auswaehlen");
   while(true){
@@ -132,20 +136,29 @@ void start(){
 
 void addCocktails(){
   resetGlobalVariables();
-  mylcd.Fill_Screen(BLACK);
-
-  numOfChoices = 8;
-
-  print("Waehle eine der folgenden Cocktails aus:");
-  print("");
   
-  for(int i = 0; i < 8; i++){
-    printChoiceToPages(supportedCocktails[i]);
-  }
+  printAddCocktailsMenu();
 
   while(true){
     focusedChoice = getTurnKnobIndex();
     focus();
+
+    if(isOkButtonPressed()){
+      // last Choice & next page option exists
+      if(focusedChoice == numOfChoices - 1 && currentPage < numOfPages - 1){
+        goToNextPage();
+        printAddCocktailsMenu();
+      }
+      else if(focusedChoice == 0 && currentPage > 0){
+        goToPreviousPage();
+        printAddCocktailsMenu();
+      }
+      else if(focusedChoice == 0 && currentPage == 0){
+        state = "addIngredients";
+        return;
+      }
+
+    }
 
     if(isBackButtonPressed()){
       lastState = "addCocktails";
@@ -158,37 +171,28 @@ void addCocktails(){
 
 void addIngredients(){
   resetGlobalVariables();
-  mylcd.Fill_Screen(BLACK);
-
-  print("Waehle eine der folgenden Zutaten aus:");
-  print("");
   
-  printChoicesAddIngredients();     // sets numOfChoices
+  printAddIngredientsMenu();     // sets numOfChoices
 
   while(true){
     focusedChoice = getTurnKnobIndex();
     focus();
 
     if(isOkButtonPressed()){
-      // last Choice
-      if(focusedChoice == numOfChoices - 1){
-        // next page option exists
-        if(currentPage < numOfPages - 1){
-          mylcd.Fill_Screen(BLACK);
-          int numOfPagesBuf = numOfPages;
-          int currentPageBuf = currentPage;
-          resetGlobalVariables();
-          numOfPages = numOfPagesBuf;
-          currentPage = currentPageBuf + 1; // went one page further
-          numOfChoicesOnPage[currentPage] = 0;
-
-          Serial.print("NUM OF CHOICES LAST PAGE: ");
-          Serial.println(numOfChoicesOnPage[currentPage - 1]);
-
-          printChoicesAddIngredients();
-        }
+      // last Choice & next page option exists
+      if(focusedChoice == numOfChoices - 1 && currentPage < numOfPages - 1){
+        goToNextPage();
+        printAddIngredientsMenu();
       }
-      
+      else if(focusedChoice == 0 && currentPage > 0){
+        goToPreviousPage();
+        printAddIngredientsMenu();
+      }
+      else if(focusedChoice == 0 && currentPage == 0){
+        state = "addCocktails";
+        return;
+      }
+
     }
 
     if(isBackButtonPressed()){
@@ -207,7 +211,7 @@ void confirmGoingBack(){
   numOfChoices = 2;
 
   print("Wirklich zurueckgehen?");
-  print("");
+  addSpacingY(textChoiceSpacingY);
   printChoice("Abbrechen");
   printChoice("Ja, zurueckgehen");
 
@@ -239,8 +243,14 @@ void end(){
 
 // INTERRUPT FUNCTIONS
 void okButtonPress(){
-  inputState = 2;
-  Serial.println("OK-Button: pressed");
+  // check if enough time has passed and if rotation occured
+  if((millis() - timeOfLastDebouncePress) > delayOfDebouncePress){
+      timeOfLastDebouncePress = millis();
+
+      inputState = 2;
+      Serial.println("OK-Button: pressed");
+  }
+  
 }
 
 void backButtonPress(){
@@ -249,12 +259,12 @@ void backButtonPress(){
 }
 
 void knobTurn(){
-  int clkState = digitalRead(pinCLK);
-  int dtState = digitalRead(pinDT);
-
   // check if enough time has passed and if rotation occured
-  if((millis() - timeOfLastDebounce) > delayOfDebounce){
-      timeOfLastDebounce = millis();
+  if((millis() - timeOfLastDebounceTurn) > delayOfDebounceTurn){
+      timeOfLastDebounceTurn = millis();
+
+      int clkState = digitalRead(pinCLK);
+      int dtState = digitalRead(pinDT);
 
       if(dtState != clkState){          
           inputState = 1;
@@ -267,12 +277,45 @@ void knobTurn(){
 }
 
 
-// HELPER FUCTIONS
+// MENU PRINT FUNCTIONS
+void printAddCocktailsMenu(){
+  mylcd.Fill_Screen(BLACK);
 
-void printChoicesAddIngredients(){
-  for(int i = 0; i < 15; i++){
+  if(currentPage == 0){
+    print("Waehle eine der folgenden Cocktails aus:");
+    addSpacingY(textChoiceSpacingY);
+    printChoice("Zutaten hinzufuegen");
+  }
+
+  for(int i = 0; i < 8; i++){
+    printChoiceToPages(supportedCocktails[i]);
+  }
+
+  if(currentPage == 0)
+    numOfChoices++; // additional "Zutaten hinzufügen" option
+}
+
+void printAddIngredientsMenu(){
+  mylcd.Fill_Screen(BLACK);
+
+  if(currentPage == 0){
+    print("Waehle eine der folgenden Zutaten aus:");
+    addSpacingY(textChoiceSpacingY);
+    printChoice("Cocktails hinzufuegen");
+  }
+
+  for(int i = 0; i < 25; i++){
     printChoiceToPages(supportedIngredients[i]);
   }
+
+  if(currentPage == 0)
+    numOfChoices++; // additional "Cocktails hinzufuegen" option
+}
+
+// HELPER FUCTIONS
+void addSpacingY(int spacingY){
+  textPosY += spacingY;
+  startOfChoicesY = textPosY;
 }
 
 void print(String message){
@@ -316,7 +359,7 @@ void printChoiceToPages(String message){
 
   // print option to go to next page
   if(textPosY >= choiceMaxPosY){
-    if(nextPageOptionPrinted  || numOfPages == maxNumOfPages) return;
+    if(nextPageOptionPrinted || numOfPages == maxNumOfPages) return;
 
     printChoice("Naechste Seite");
     numOfPages++;
@@ -328,6 +371,16 @@ void printChoiceToPages(String message){
   printChoice(message);
   numOfChoicesOnPage[currentPage]++;
   numOfChoices = currentPage == 0 ? numOfChoicesOnPage[currentPage] : numOfChoicesOnPage[currentPage] + 1;  // one more choice: additional prev. Page Option
+}
+
+void goToNextPage(){
+  currentPage++; // went to next page
+  resetGlobalVariablesForPage();
+}
+
+void goToPreviousPage(){
+  currentPage--; // went to previous page
+  resetGlobalVariablesForPage();
 }
 
 void focus(){
@@ -382,23 +435,25 @@ bool isBackButtonPressed(){
 }
 
 void resetGlobalVariables(){
-  resetGlobalPageVariables();
+  resetGlobalVariablesForPage();
 
+  numOfPages = 1;
+  currentPage = 0;
+  numOfChoicesOnPage[0] = 0;
+}
+
+void resetGlobalVariablesForPage(){
+  nextPageOptionPrinted = false;
+  previousPageOptionPrinted = false;
+  skippedChoices = 0;
+  previousPageChoicesSkipped = false;
   textPosY = textPaddingY;
   startOfChoicesY = textPaddingY;
   lastFocusedChoice = -1;
   focusedChoice = 0;
   counter = 0;
-  numOfPages = 1;
-  currentPage = 0;
-  
-}
 
-void resetGlobalPageVariables(){
-  nextPageOptionPrinted = false;
-  previousPageOptionPrinted = false;
-  skippedChoices = 0;
-  previousPageChoicesSkipped = false;
+  numOfChoicesOnPage[currentPage] = 0;
 }
 
 
