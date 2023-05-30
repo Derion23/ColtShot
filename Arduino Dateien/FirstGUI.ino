@@ -7,6 +7,7 @@ LCDWIKI_KBV mylcd(ILI9486,A3,A2,A1,A0,A4); //model,cs,cd,wr,rd,reset
 
 // CLASSES VARIABLES AND FUNCTIONS
 const int numOfTanks = 6;
+int numOfEmptyTanks = numOfTanks;
 void print(String message);
 
 // CLASSES
@@ -92,9 +93,11 @@ class ColtShot{
 
     void addContent(String content){
       for(int i = 0; i < numOfTanks; i++){
-        if(this->tanks[i].getContent() == "")
-        this->tanks[i].setContent(content);
-        return;
+        if(this->tanks[i].getContent() == ""){
+          this->tanks[i].setContent(content);
+          numOfEmptyTanks--;
+          return;
+        }
       }
     }
 
@@ -104,21 +107,6 @@ class ColtShot{
         this->tanks[i].setContent("");
       }
     }
-    
-    void printTanks(){
-      print("Tanks:");
-      for (int i = 0; i < numOfTanks; i++){
-        print("Content: " + this->tanks[i].getContent() + ", Amount: " + char(this->tanks[i].getAmount()) + "cl");
-      }
-    }
-    /*
-    void TestPrintTanks(){
-      print("Tanks:");
-      for (int i = 0; i < numOfTanks; i++){
-        Serial.println("Content: " + this->tanks[i].getContent() + ", Amount: " + String(this->tanks[i].getAmount()) + "cl");
-      }
-    }
-    */
 
     String getTankContent(int index){ return this->tanks[index].getContent();}
   };
@@ -139,17 +127,12 @@ const int maxNumOfIngredients = 40;
 const int separatorLineX = 280;
 const int separatorLineY = 80;
 
-const String supportedIngredients[] = {"Sprudelwasser", "Whiskey", "Limettensaft", "Tequila", "Orangensaft", "Gin", "Vodka", "Rum", "Cola", "TonicWater", "OrangenLikoer", "Sirup", "Martini", "Cachaca", "GrenadineSirup",
-"a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m", "n", "o", "p"};
-const String supportedCocktails[] = {"Gin Tonic", "Margaritha", "Cuba Libre", "Daiquiri", "Vodka Gimlet", "Martini Cola", "Mojito", "Caipirinha", "Tequila Sunrise"};
-
-
 // GLOBAL VARIABLES
 String state = "start";
 String lastState;
 String secondLastState;
 
-// maybe use instead of integers bytes for saving storage
+// maybe use bytes instead of integers to saving storage
 int textPosY;
 int startOfChoicesY;
 int lastFocusedChoice;
@@ -165,10 +148,13 @@ bool previousPageChoicesSkipped = false;
 
 ColtShot cs;
 Cocktail cocktails[maxNumOfCocktails];
+bool possibleCocktails[maxNumOfCocktails];
+bool availableCocktails[maxNumOfCocktails];
+
 String ingredients[maxNumOfIngredients];
 bool chosenIngredients[maxNumOfIngredients];
 
-// SD CARD, name of opened txt file could no be longer than 8 chars
+// SD CARD, name of opened txt file could not be longer than 8 chars
 int pinSD = 53;
 int pinSDVcc = 22;
 int pinSDGnd = 48;
@@ -233,6 +219,8 @@ void setup() {
 
   // setup ColtShot
   cs = ColtShot();
+  initPossibleCocktails();
+  initAvailableCocktails();
   initChosenIngredientsArr();
 
   // SD card
@@ -255,6 +243,8 @@ void loop() {
     addIngredients();
   else if(state == "confirmGoingBack")
     confirmGoingBack();
+  else if(state == "tankContentSet")
+    tankContentSet();
   else if(state == "error")
     error();
 }
@@ -311,6 +301,26 @@ void addCocktails(){
         return;
       }
 
+      // Cocktail clicked
+      int index = focusedChoice - 1; // -1 because there is always a non Cocktail option at position 0
+      for(int i = 0; i < currentPage; i++){
+        index += numOfChoicesOnPage[i];
+      }
+      int currentIndex = 0;
+      for(int i = 0; i < maxNumOfCocktails; i++){
+        if(possibleCocktails[i] == false) continue;
+
+        if(index == currentIndex) {
+          addCocktail(cocktails[i]);
+          updatePossibleCocktails();
+          if(numOfEmptyTanks == 0 || !arePossibleCocktails())
+            state = "tankContentSet";
+          
+          return;
+        }
+
+        currentIndex++;
+      }
     }
 
     if(isBackButtonPressed()){
@@ -336,16 +346,38 @@ void addIngredients(){
       if(focusedChoice == numOfChoices - 1 && currentPage < numOfPages - 1){
         goToNextPage();
         printAddIngredientsMenu();
+        continue;
       }
       else if(focusedChoice == 0 && currentPage > 0){
         goToPreviousPage();
         printAddIngredientsMenu();
+        continue;
       }
       else if(focusedChoice == 0 && currentPage == 0){
         state = "addCocktails";
         return;
       }
 
+      // Ingredient clicked
+      int index = focusedChoice - 1; // -1 because there is always a non Ingredient option at position 0
+      for(int i = 0; i < currentPage; i++){
+        index += numOfChoicesOnPage[i];
+      }
+      int currentIndex = 0;
+      for(int i = 0; i < maxNumOfIngredients; i++){
+        if(chosenIngredients[i] == true) continue;
+
+        if(index == currentIndex) {
+          chosenIngredients[i] = true;
+          cs.addContent(ingredients[i]);
+          if(numOfEmptyTanks == 0)
+            state = "tankContentSet";
+          
+          return;
+        }
+
+        currentIndex++;
+      }
     }
 
     if(isBackButtonPressed()){
@@ -381,6 +413,26 @@ void confirmGoingBack(){
 
       return;
     }
+  }
+}
+
+void tankContentSet(){
+  mylcd.Fill_Screen(BLACK);
+  resetGlobalVariables();
+
+  print("Die Tankinhalte sind jetzt festgelegt");
+  print("Es koennen nun folgende");
+  print("Cocktails zubereitet werden:");
+  print("Die Maschine muss dafuer mit den");
+  print("folgenden Zutaten befuellt werden");
+
+  numOfChoices = 2;
+  printChoice("Weiter zur Befuellung der Maschine");
+  printChoice("Abbrechen, und Tankinhalte loeschen");
+
+
+  while(true){
+
   }
 }
 
@@ -432,6 +484,7 @@ void knobTurn(){
 // MENU PRINT FUNCTIONS
 void printAddCocktailsMenu(){
   mylcd.Fill_Screen(BLACK);
+  updatePossibleCocktails();
 
   if(currentPage == 0){
     print("Waehle eine der folgenden Cocktails aus:");
@@ -440,7 +493,8 @@ void printAddCocktailsMenu(){
   }
 
   for(int i = 0; i < maxNumOfCocktails; i++){
-    if(cocktails[i].getName() == "") break;
+    if(cocktails[i].getName() == "" ) break;
+    if(possibleCocktails[i] == false) continue;
     printChoiceToPages(cocktails[i].getName());
   }
 
@@ -460,8 +514,9 @@ void printAddIngredientsMenu(){
     printChoice("Cocktails hinzufuegen");
   }
 
-  for(int i = 0; i < 25; i++){
+  for(int i = 0; i < maxNumOfIngredients; i++){
     if(ingredients[i] == "") break;
+    if(chosenIngredients[i] == true) continue;
     printChoiceToPages(ingredients[i]);
   }
 
@@ -476,6 +531,75 @@ void printAddIngredientsMenu(){
 void initChosenIngredientsArr(){
   for(int i = 0; i < maxNumOfIngredients; i++){
     chosenIngredients[i] = false;
+  }
+}
+
+void initPossibleCocktails(){
+  for(int i = 0; i < maxNumOfCocktails; i++){
+    possibleCocktails[i] = true;
+  }
+}
+
+void initAvailableCocktails(){
+  for(int i = 0; i < maxNumOfCocktails; i++){
+    availableCocktails[i] = false;
+  }
+}
+
+void updatePossibleCocktails(){
+  for(int i = 0; i < maxNumOfCocktails; i++){
+    if(cocktails[i].getName() == "") break;
+
+    int newIngredients = 0;
+    for(int j = 0; j < numOfTanks; j++){
+      String ingredient = cocktails[i].getIngredient(j).getName();
+      if(ingredient == "") break;
+      bool isInTanks = false;
+      for(int k = 0; k < numOfTanks; k++){
+        if(ingredient != cs.getTankContent(k)) continue;
+        isInTanks = true;
+        break;
+      }
+      newIngredients += !isInTanks;
+    }
+    
+    Serial.print(cocktails[i].getName());
+    Serial.print(": new Ingredients: ");
+    Serial.println(newIngredients);
+
+
+    // already available or not possible
+    if(newIngredients == 0 || newIngredients > numOfEmptyTanks){
+      possibleCocktails[i] = false;
+      continue;
+    }
+    
+    possibleCocktails[i] = true;
+  }
+}
+
+bool arePossibleCocktails(){
+  for(int i = 0; i < maxNumOfCocktails; i++){
+    if(cocktails[i].getName() == "") return false;
+    if(possibleCocktails[i] == true) return true;
+  }
+  return false;
+}
+
+void addCocktail(Cocktail cocktail){
+  // mark every ingredient in the chosen Coktail as chosen
+  for(int i = 0; i < numOfTanks; i++){
+    String ingredient = cocktail.getIngredient(i).getName();
+    if(ingredient == "") return;
+    for(int j = 0; j < maxNumOfIngredients; j++){
+      if(ingredients[j] == "") break;
+      if(ingredients[j] != ingredient) continue;
+      // ingredient was chosen before
+      if(chosenIngredients[j] == true) break;
+
+      chosenIngredients[j] = true;
+      cs.addContent(ingredient);
+    }
   }
 }
 
