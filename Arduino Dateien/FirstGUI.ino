@@ -8,6 +8,7 @@ LCDWIKI_KBV mylcd(ILI9486,A3,A2,A1,A0,A4); //model,cs,cd,wr,rd,reset
 // CLASSES VARIABLES AND FUNCTIONS
 const int numOfTanks = 6;
 int numOfEmptyTanks = numOfTanks;
+int currentTankIndex = 0;
 void print(String message);
 
 // CLASSES
@@ -82,7 +83,7 @@ class Tank{
     void fillTo(int amount){this->fillingLevel = amount;}
     void withdraw(int amount){this->fillingLevel -= amount;}
     String getContent(){  return this->content; }
-    int getAmount(){ return this->fillingLevel;}
+    int getFillingLevel(){ return this->fillingLevel;}
 };
 
 class ColtShot{
@@ -106,9 +107,16 @@ class ColtShot{
         this->tanks[i].fillTo(0);
         this->tanks[i].setContent("");
       }
+      numOfEmptyTanks = numOfTanks;
+      currentTankIndex = 0;
+    }
+
+    void fillTankTo(int index, int fillingLevel){
+      this->tanks[index].fillTo(fillingLevel);
     }
 
     String getTankContent(int index){ return this->tanks[index].getContent();}
+    int getTankFillingLevel(int index){ return this->tanks[index].getFillingLevel();}
   };
 
 // CONSTANTS
@@ -126,6 +134,8 @@ const int maxNumOfCocktails = 20;
 const int maxNumOfIngredients = 40;
 const int separatorLineX = 280;
 const int separatorLineY = 80;
+const int maxNumOfCharsPerLine = 37;
+const int tankMarkToCl = 10;
 
 // GLOBAL VARIABLES
 String state = "start";
@@ -145,6 +155,7 @@ bool previousPageOptionPrinted = false;
 int numOfChoicesOnPage[maxNumOfPages - 1];
 int skippedChoices = 0; // numOfChoices which were not printed because the were on a previous page
 bool previousPageChoicesSkipped = false;
+String goingBackMessage = "";
 
 ColtShot cs;
 Cocktail cocktails[maxNumOfCocktails];
@@ -237,6 +248,8 @@ void setup() {
 void loop() {
   if(state == "start")
     start();
+  else if(state == "restoreFromSDCard")
+    restoreFromSDCard();
   else if(state == "addCocktails")
     addCocktails();
   else if(state == "addIngredients")
@@ -245,6 +258,10 @@ void loop() {
     confirmGoingBack();
   else if(state == "tankContentSet")
     tankContentSet();
+  else if(state == "fillTanks")
+    fillTanks();
+  else if(state == "machineFilled")
+    machineFilled();
   else if(state == "error")
     error();
 }
@@ -252,6 +269,12 @@ void loop() {
 
 // MENU FUNCTIONS 
 void start(){
+  // Check if tankContents were saved
+  if(tankContentsSaved()){
+    state = "restoreFromSDCard";
+    return;
+  }
+
   resetGlobalVariables();
   mylcd.Fill_Screen(BLACK);
 
@@ -271,6 +294,35 @@ void start(){
         state = "addCocktails";
       else if(focusedChoice == 1)
         state = "addIngredients";
+        
+      return;
+    }
+  }
+}
+
+void restoreFromSDCard(){
+  resetGlobalVariables();
+  mylcd.Fill_Screen(BLACK);
+
+  numOfChoices = 2;
+
+  print("Es wurden Tankinhalte auf der SD Karte");
+  print("gespeichert. Daten wiederherstellen?");
+  addSpacingY(textChoiceSpacingY);
+  printChoice("Ja, wiederherstellen");
+  printChoice("Nein");
+  while(true){
+    focusedChoice = getTurnKnobIndex();
+    focus();
+
+    if(isOkButtonPressed()){
+      if(focusedChoice == 0)
+        downloadTankContentsFromSDCard(); // sets State
+      else if(focusedChoice == 1){
+        File tankContentsTxt = SD.open("tanks.txt", FILE_WRITE | O_TRUNC);    // O_TRUNC deletes existing file content
+        tankContentsTxt.close();
+        state = "start";
+      }
         
       return;
     }
@@ -311,10 +363,7 @@ void addCocktails(){
         if(possibleCocktails[i] == false) continue;
 
         if(index == currentIndex) {
-          addCocktail(cocktails[i]);
-          updatePossibleCocktails();
-          if(numOfEmptyTanks == 0 || !arePossibleCocktails())
-            state = "tankContentSet";
+          confirmAddCocktail(cocktails[i]);
           
           return;
         }
@@ -326,6 +375,8 @@ void addCocktails(){
     if(isBackButtonPressed()){
       lastState = "addCocktails";
       secondLastState = "start";
+      goingBackMessage = "Ja, alle Tanks werden geloescht";
+
       state = "confirmGoingBack";
       return;
     }
@@ -383,6 +434,7 @@ void addIngredients(){
     if(isBackButtonPressed()){
       lastState = "addIngredients";
       secondLastState = "start";
+      goingBackMessage = "Ja, alle Tanks werden geloescht";
       state = "confirmGoingBack";
       return;
     }
@@ -398,7 +450,7 @@ void confirmGoingBack(){
   print("Wirklich zurueckgehen?");
   addSpacingY(textChoiceSpacingY);
   printChoice("Abbrechen");
-  printChoice("Ja, zurueckgehen");
+  printChoice(goingBackMessage);
 
   while(true){
     focusedChoice = getTurnKnobIndex();
@@ -408,6 +460,7 @@ void confirmGoingBack(){
       if(focusedChoice == 0){
         state = lastState;
       } else if(focusedChoice == 1){
+        deleteTankContents();
         state = secondLastState;
       }
 
@@ -420,17 +473,95 @@ void tankContentSet(){
   mylcd.Fill_Screen(BLACK);
   resetGlobalVariables();
 
+  // needed to get the available Cocktails
+  updateAvailableCocktails();
+  saveTankContentsToSD("tankContentSet");
+
   print("Die Tankinhalte sind jetzt festgelegt");
-  print("Es koennen nun folgende");
-  print("Cocktails zubereitet werden:");
+  print("und wurden auf der SD-Karte gespeichert");
+  print("Es koennen nun folgende Cocktails");
+  print("zubereitet werden:");
+
+  addSpacingY(10);
+  printAvailableCocktails();
+  addSpacingY(10);
+
   print("Die Maschine muss dafuer mit den");
-  print("folgenden Zutaten befuellt werden");
+  print("folgenden Zutaten befuellt werden:");
 
-  numOfChoices = 2;
+  addSpacingY(10);
+  printTankContents();
+  addSpacingY(textChoiceSpacingY);
+
+  numOfChoices = 1;
   printChoice("Weiter zur Befuellung der Maschine");
-  printChoice("Abbrechen, und Tankinhalte loeschen");
+  
+  
+  while(true){
+    focusedChoice = getTurnKnobIndex();
+    focus();
+    
+    if(isOkButtonPressed()){
+      state = "fillTanks";
+      return;
+    } else if(isBackButtonPressed()){
+      lastState = "tankContentSet";
+      secondLastState = "start";
+      goingBackMessage = "Ja, alle Tanks werden geloescht";
 
+      state = "confirmGoingBack";
+      return;
+    }
+  }
+}
 
+void fillTanks(){
+  String ingredient = cs.getTankContent(currentTankIndex);
+  if(ingredient == ""){
+    state = "machineFilled";
+    currentTankIndex = 0;
+    return;
+  }
+  mylcd.Fill_Screen(BLACK);
+  resetGlobalVariables();
+  print("Fuelle den Tank direkt ueber dem Glas");
+  print("mit " + ingredient + ".");
+  print("Gefuellt bis zur Markierung:");
+  numOfChoices = 5;
+  addSpacingY(textChoiceSpacingY);
+  printChoice("1");
+  printChoice("2");
+  printChoice("3");
+  printChoice("4");
+  printChoice("5");
+
+  while(true){
+    focusedChoice = getTurnKnobIndex();
+    focus();
+
+    if(isOkButtonPressed()){
+      int fillingLevel = (focusedChoice + 1) * tankMarkToCl;
+      cs.fillTankTo(currentTankIndex, fillingLevel);
+
+      if(currentTankIndex == numOfTanks - 1){
+        state = "machineFilled";
+        currentTankIndex = 0;
+        return;
+      }
+      currentTankIndex++;
+      return;
+    } else if(isBackButtonPressed()){
+      lastState = "fillTanks";
+      secondLastState = "start";
+      state = "confirmGoingBack";
+      return;
+    }
+  }
+}
+
+void machineFilled(){
+   mylcd.Fill_Screen(BLACK);
+  print("Maschine ist nun gefüllt");
   while(true){
 
   }
@@ -505,6 +636,44 @@ void printAddCocktailsMenu(){
     numOfChoices++; // additional "Zutaten hinzufügen" option
 }
 
+void confirmAddCocktail(Cocktail cocktail){
+  mylcd.Fill_Screen(BLACK);
+  resetGlobalVariables();
+
+  print(cocktail.getName() + " hinzufuegen?");
+  addSpacingY(textChoiceSpacingY);
+  // Maybe insert short info about the cocktail here
+  print("Enthaltene Zutaten:");
+
+  for(int i = 0; i < numOfTanks; i++){
+    Ingredient ingredient = cocktail.getIngredient(i);
+    if(ingredient.getName() == "") break;
+    
+    print(ingredient.getName() + ": " + ingredient.getAmount() + "cl");
+  }
+
+  addSpacingY(textChoiceSpacingY);
+  numOfChoices = 2;
+  printChoice("Ja, Cocktail hinzufuegen");
+  printChoice("Abbrechen");
+
+  while(true){
+    focusedChoice = getTurnKnobIndex();
+    focus();
+
+    if(isOkButtonPressed()){
+      if(focusedChoice == 0){
+        addCocktail(cocktail);
+        updatePossibleCocktails();
+        if(numOfEmptyTanks == 0 || !arePossibleCocktails())
+          state = "tankContentSet";
+      }
+      
+      return;
+    }
+  }
+}
+
 void printAddIngredientsMenu(){
   mylcd.Fill_Screen(BLACK);
 
@@ -527,7 +696,102 @@ void printAddIngredientsMenu(){
     numOfChoices++; // additional "Cocktails hinzufuegen" option
 }
 
+// .length returns correctNumOfChars + 1
+void printAvailableCocktails(){
+  // at most 10 available Cocktails possible
+  int maxNumOfAvailableCocktails = 10;
+  String availableCocktailsArr[maxNumOfAvailableCocktails];
+  int currentIndex = 0;
+
+  for(int i = 0; i < maxNumOfCocktails; i++){
+    String cocktailName = cocktails[i].getName();
+    if(cocktailName == "") break;
+    if(!availableCocktails[i]) continue;
+
+    availableCocktailsArr[currentIndex] = cocktailName;
+    currentIndex++;
+  }
+
+  // print availableCocktailsArr
+  int currentStringLength = availableCocktailsArr[0].length() - 1;
+  String availableCocktailsStr = availableCocktailsArr[0];
+  for(int i = 1; i < currentIndex; i++){
+    int addedLength = 1 + availableCocktailsArr[i].length();  // 2 for ", " and -1 for length: "123".length() => 4
+    if(currentStringLength + addedLength <= maxNumOfCharsPerLine){
+      currentStringLength += addedLength;
+
+      availableCocktailsStr += ", " + availableCocktailsArr[i];
+    } else{
+      // print a new line with these Cocktails
+      print(availableCocktailsStr);
+
+      currentStringLength = addedLength - 2;
+      availableCocktailsStr = availableCocktailsArr[i];
+    }
+  }
+
+  // print not yet printed Cocktails
+  print(availableCocktailsStr);
+}
+
+// prints separator lines and Tanks vertically
+void printTanks(){
+  // print lines
+  mylcd.Set_Draw_color(WHITE);
+  mylcd.Draw_Fast_HLine(separatorLineX, separatorLineY, 400);
+  mylcd.Draw_Fast_VLine(separatorLineX, separatorLineY, 300);
+
+  int textPosXTanks = textPaddingX + separatorLineX;
+  int textPosYTanks = textPaddingY + separatorLineY;
+  mylcd.Print_String("Tanks:",textPosXTanks , textPosYTanks);
+  for(int i = 0; i < numOfTanks; i++){
+    textPosYTanks += textSpacingY;
+    String tankContent = cs.getTankContent(i) == "" ? "leer" : cs.getTankContent(i);
+    mylcd.Print_String(tankContent, textPosXTanks , textPosYTanks);
+  }
+}
+
+// prints tanks horizontally for tankContentSet-Menu; .length returns correct numOfChars
+void printTankContents(){
+  int currentStringLength = cs.getTankContent(0).length();
+  String tankContentsStr = cs.getTankContent(0);
+  for(int i = 1; i < numOfTanks; i++){
+    String newIngredientStr = cs.getTankContent(i);
+    if(newIngredientStr == "") break;
+
+    int addedLength = 2 + newIngredientStr.length();  // 2 for ", "
+    if(currentStringLength + addedLength <= maxNumOfCharsPerLine){
+      currentStringLength += addedLength;
+
+      Serial.print(newIngredientStr);
+      Serial.print(" : length: ");
+      Serial.print(addedLength);
+      Serial.print(" => ");
+      Serial.println(currentStringLength);
+
+      tankContentsStr += ", " + newIngredientStr;
+    } else{
+      // print a new line with these Ingredients
+      print(tankContentsStr);
+
+      currentStringLength = addedLength - 2;
+      tankContentsStr = cs.getTankContent(i);
+    }
+  }
+
+  // print not yet printed Ingredients
+  print(tankContentsStr);
+}
+
+
 // HELPER FUCTIONS
+void deleteTankContents(){
+  cs.emptyTanks();
+  initChosenIngredientsArr();
+  initPossibleCocktails();
+  initAvailableCocktails();
+}
+
 void initChosenIngredientsArr(){
   for(int i = 0; i < maxNumOfIngredients; i++){
     chosenIngredients[i] = false;
@@ -562,11 +826,6 @@ void updatePossibleCocktails(){
       }
       newIngredients += !isInTanks;
     }
-    
-    Serial.print(cocktails[i].getName());
-    Serial.print(": new Ingredients: ");
-    Serial.println(newIngredients);
-
 
     // already available or not possible
     if(newIngredients == 0 || newIngredients > numOfEmptyTanks){
@@ -575,6 +834,30 @@ void updatePossibleCocktails(){
     }
     
     possibleCocktails[i] = true;
+  }
+}
+
+void updateAvailableCocktails(){
+  for(int i = 0; i < maxNumOfCocktails; i++){
+    if(cocktails[i].getName() == "") break;
+
+    bool cocktailAvailable = true;
+    for(int j = 0; j < numOfTanks; j++){
+      String ingredient = cocktails[i].getIngredient(j).getName();
+      if(ingredient == "") break;
+      bool isInTanks = false;
+      for(int k = 0; k < numOfTanks; k++){
+        if(ingredient != cs.getTankContent(k)) continue;
+        isInTanks = true;
+        break;
+      }
+      if(!isInTanks){
+        cocktailAvailable = false;
+        break;
+      }
+    }
+
+    availableCocktails[i] = cocktailAvailable;
   }
 }
 
@@ -619,9 +902,6 @@ void printChoice(String message){
   mylcd.Print_String(message, 2 * textPaddingX + 2 * choiceRadioButtonRadius, textPosY);
   mylcd.Draw_Circle(textPaddingX + choiceRadioButtonRadius, textPosY + choiceRadioButtonRadius - correctionCirclePosY, choiceRadioButtonRadius);
 
-  Serial.print("TextPosY: ");
-  Serial.println(textPosY);
-
   textPosY += choiceSpacingY;
 }
 
@@ -661,22 +941,6 @@ void printChoiceToPages(String message){
   printChoice(message);
   numOfChoicesOnPage[currentPage]++;
   numOfChoices = currentPage == 0 ? numOfChoicesOnPage[currentPage] : numOfChoicesOnPage[currentPage] + 1;  // one more choice: additional prev. Page Option
-}
-
-void printTanks(){
-  // print lines
-  mylcd.Set_Draw_color(WHITE);
-  mylcd.Draw_Fast_HLine(separatorLineX, separatorLineY, 400);
-  mylcd.Draw_Fast_VLine(separatorLineX, separatorLineY, 300);
-
-  int textPosXTanks = textPaddingX + separatorLineX;
-  int textPosYTanks = textPaddingY + separatorLineY;
-  mylcd.Print_String("Tanks:",textPosXTanks , textPosYTanks);
-  for(int i = 0; i < numOfTanks; i++){
-    textPosYTanks += textSpacingY;
-    String tankContent = cs.getTankContent(i) == "" ? "leer" : cs.getTankContent(i);
-    mylcd.Print_String(tankContent, textPosXTanks , textPosYTanks);
-  }
 }
 
 void goToNextPage(){
@@ -764,6 +1028,23 @@ void resetGlobalVariablesForPage(){
 
 
 // SD Card
+bool tankContentsSaved(){
+  File tankContentsTxt = SD.open("tanks.txt");
+  if(!tankContentsTxt){
+    // if the file didn't open, print an error:
+    Serial.println("error opening tanks.txt");
+    state = "error";
+    return;
+  }
+
+  Serial.println("Check if tank contents were saved");
+
+  bool tankContentsSaved = tankContentsTxt.available();
+  tankContentsTxt.close();
+
+  return tankContentsSaved;
+}
+
 bool initializeSDCard(){
   Serial.print("Initializing SD card...");
   if (!SD.begin(53)) {
@@ -869,6 +1150,57 @@ void downloadIngredientsFromSD(){
   
 }
 
+void downloadTankContentsFromSDCard(){
+  File tankContentsTxt = SD.open("tanks.txt");
+  if(!tankContentsTxt){
+    // if the file didn't open, print an error:
+    Serial.println("error opening tanks.txt");
+    state = "error";
+    return;
+  }
+
+  cs.emptyTanks();
+
+  for(int i = 0; i < numOfTanks; i++){
+    String ingredientName = "";
+    while (tankContentsTxt.available()) {
+      char currentChar = tankContentsTxt.read();
+      if(currentChar == ',') break;
+      if(currentChar != '\n')
+        ingredientName += currentChar;
+    }
+
+    String fillingLevelStr = "";
+    while (tankContentsTxt.available()) {
+      char currentChar = tankContentsTxt.read();
+      if(currentChar == ',') break;
+      if(currentChar != '\n')
+        fillingLevelStr += currentChar;
+    }
+  
+    Serial.println("downloading " + ingredientName);
+
+    // Save TanksContents
+    if(ingredientName == "leer")
+      ingredientName = "";
+    
+    cs.addContent(ingredientName);
+    cs.fillTankTo(i, fillingLevelStr.toInt());
+  }
+
+  String newState = "";
+  while (tankContentsTxt.available()) {
+    char currentChar = tankContentsTxt.read();
+    if(currentChar == ',') break;
+    if(currentChar != '\n')
+      newState += currentChar;
+  }
+
+  tankContentsTxt.close();
+  state = newState;
+}
+
+
 void saveIngredientsFromCocktailsToSD(){
   File ingredientsTxt = SD.open("ingred.txt");
   if(!ingredientsTxt){
@@ -910,14 +1242,36 @@ void saveIngredientsFromCocktailsToSD(){
       if(!isInside){
         ingredientsTxt.close();
         ingredientsTxt = SD.open("ingred.txt", FILE_WRITE);
-        ingredientsTxt.print(ingredient);
-        ingredientsTxt.print(",");
+        ingredientsTxt.print(ingredient + ",");
         ingredientsTxt.close();
       }
     }
   }
 
   ingredientsTxt.close();
+}
+
+void saveTankContentsToSD(String lastState){
+  File tankContentsTxt = SD.open("tanks.txt", FILE_WRITE | O_TRUNC);    // O_TRUNC deletes existing file content
+  if(!tankContentsTxt){
+    // if the file didn't open, print an error:
+    Serial.println("error opening tanks.txt");
+    state = "error";
+    return;
+  }
+
+  Serial.println("saving TankContents");
+
+  for(int i = 0; i < numOfTanks; i++){
+    String ingredientName = cs.getTankContent(i);   //
+    if(ingredientName == "") 
+      ingredientName == "leer";
+    
+    tankContentsTxt.println(ingredientName + "," + cs.getTankFillingLevel(i) + ",");
+    
+  }
+  tankContentsTxt.print(lastState + ",");
+  tankContentsTxt.close();
 }
 
 
