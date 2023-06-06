@@ -6,9 +6,9 @@
 LCDWIKI_KBV mylcd(ILI9486,A3,A2,A1,A0,A4); //model,cs,cd,wr,rd,reset
 
 // CLASSES VARIABLES AND FUNCTIONS
-const int numOfTanks = 6;
-int numOfEmptyTanks = numOfTanks;
-int currentTankIndex = 0;
+const byte numOfTanks = 6;
+byte numOfEmptyTanks = numOfTanks;
+byte currentTankIndex = 0;
 void saveTankContentsToSD(String lasState);
 
 // CLASSES
@@ -35,12 +35,14 @@ class Cocktail{
   private:
     String name;
     Ingredient ingredients[numOfTanks];
+    bool mix = false;
 
   public:
     Cocktail(){this->name = "";}
 
-    Cocktail(String name, Ingredient ingredients[numOfTanks]){
+    Cocktail(String name, Ingredient ingredients[numOfTanks], bool mix){
       this->name = name;
+      this->mix = mix;
       for (int i = 0; i < numOfTanks; i++){
         this->ingredients[i] = Ingredient(ingredients[i].getName(), ingredients[i].getAmount());
         if(ingredients[i].getName() == "") break;
@@ -106,7 +108,11 @@ class ColtShot{
 
     void fillTankTo(int index, int fillingLevel){
       this->tanks[index].fillTo(fillingLevel);
-      saveTankContentsToSD("masterOverview");
+      saveTankContentsToSD(F("masterOverview"));
+    }
+
+    void withdraw(int index, int amount){
+      this->tanks[index].fillTo(this->tanks[index].getFillingLevel() - amount);
     }
 
     void fillTankToSetup(int index, int fillingLevel){
@@ -118,29 +124,30 @@ class ColtShot{
   };
 
 // CONSTANTS
-const int textPaddingX = 10;
-const int textPaddingY = 10;
-const int textSpacingY = 20;
-const int choiceRadioButtonRadius = 10;
-const int focusedCircleRadius = 8;
-const int choiceSpacingY = 25;
-const int correctionCirclePosY = 3;
+const byte maxNumOfCocktails = 30;
+const byte maxNumOfIngredients = 60;
+
+const byte textPaddingX = 10;
+const byte textPaddingY = 10;
+const byte textSpacingY = 20;
+const byte choiceRadioButtonRadius = 10;
+const byte focusedCircleRadius = 8;
+const byte choiceSpacingY = 25;
+const byte correctionCirclePosY = 3;
 const int choiceMaxPosY = 280;
-const int maxNumOfPages = 5;
-const int textChoiceSpacingY = 15;
-const int maxNumOfCocktails = 15;
-const int maxNumOfIngredients = 30;
+const byte maxNumOfPages = 5;
+const byte textChoiceSpacingY = 15;
 const int separatorLineX = 280;
 const int separatorLineWideX = 220;
-const int separatorLineY = 80;
-const int seperatorLineWideY = 95;
-const int maxNumOfCharsPerLine = 37;
-const int tankMarkToCl = 10;
-const int printTanksWideX = 25;
-const int maxGlassCapacity = 30;     // a Cocktail has to be smaller than 30cl
-const int maxAmountPerIngredient = 20;
-const int shotSize = 2;
-const int maxRandomNum = 3; // exclusive, determines probability in Game
+const byte separatorLineY = 80;
+const byte seperatorLineWideY = 115;
+const byte maxNumOfCharsPerLine = 37;
+const byte tankMarkToCl = 10;
+const byte printTanksWideX = 25;
+const byte maxGlassCapacity = 30;     // a Cocktail has to be smaller than that capacity
+const byte maxAmountPerIngredient = 20;
+const byte shotSize = 2;
+const byte maxRandomNum = 3; // exclusive, determines probability in Game
 
 // GLOBAL VARIABLES
 String state = "restoreFromSDCard";
@@ -150,20 +157,20 @@ String secondLastState;
 // maybe use bytes instead of integers to save storage
 int textPosY;
 int startOfChoicesY;
-int lastFocusedChoice;
-int focusedChoice;
-int numOfChoices;
-int currentPage = 0;
-int numOfPages = 1;
+byte lastFocusedChoice;
+byte focusedChoice;
+byte numOfChoices;
+byte currentPage = 0;
+byte numOfPages = 1;
 bool nextPageOptionPrinted = false;
 bool previousPageOptionPrinted = false;
-int numOfChoicesOnPage[maxNumOfPages - 1];
-int skippedChoices = 0; // numOfChoices which were not printed because the were on a previous page
+byte numOfChoicesOnPage[maxNumOfPages - 1];
+byte skippedChoices = 0; // numOfChoices which were not printed because the were on a previous page
 bool previousPageChoicesSkipped = false;
 String goingBackMessage = "";
-int numIngredsCustomCocktail = 0;
-int numOfIngredsGame = 0;
-int currentGlassCapacity = maxGlassCapacity;
+byte numIngredsCustomCocktail = 0;
+byte numOfIngredsGame = 0;
+byte currentGlassCapacity = maxGlassCapacity;
 
 ColtShot cs;
 Cocktail cocktails[maxNumOfCocktails];
@@ -176,19 +183,19 @@ bool chosenIngredients[maxNumOfIngredients];
 Ingredient chosenIngredientsGame[numOfTanks];
 
 // SD CARD, name of opened txt file could not be longer than 8 chars
-int pinSD = 53;
-int pinSDVcc = 22;
-int pinSDGnd = 48;
+const byte pinSD = 53;
+const byte pinSDVcc = 22;
+const byte pinSDGnd = 48;
 
 // TURN KNOB
-int pinDT = 20;
-int pinCLK = 21;
-int pinOkBTN = 19;
-int pinBackBTN = 18;
+const byte pinDT = 20;
+const byte pinCLK = 21;
+const byte pinOkBTN = 19;
+const byte pinBackBTN = 18;
 
 int counter = 0;
-int inputState; //0: kein Input, 1: knobTurn forward, -1: knobTurn backwards, 2: OkBTNPress, 3: BackBTNPress (maybe 0-3 -> unsigned word, weniger Speicheplatz)
-int previousClkState;
+byte inputState; //0: kein Input, 1: knobTurn backwards, 2: knobTurn forward, 3: OkBTNPress, 4: BackBTNPress
+byte previousClkState;
 
 // Variables to prevent counter from bouncing, jumping
 long timeOfLastDebounceTurn = 0;
@@ -199,10 +206,7 @@ int delayOfDebouncePress = 750;
 
 // DEFINITIONS
 #define BLACK   0x0000
-#define BLUE    0x001F
 #define RED     0xF800
-#define GREEN   0x07E0
-#define YELLOW  0xFFE0
 #define WHITE   0xFFFF
 #define VERTICAL 0
 #define HORIZONTAL 3
@@ -254,40 +258,48 @@ void setup() {
   // RANDOM - randomSeed() will then shuffle the random function.
   randomSeed(analogRead(0));
 
-  Serial.println("Program started...");
+  Serial.println(F("Program started..."));
 }
 
 
 void loop() {
-  if(state == "restoreFromSDCard")
+  if(state == F("restoreFromSDCard"))
     restoreFromSDCard();
-  else if(state == "start")
+  else if(state == F("start"))
     start();
-  else if(state == "addCocktails")
+  else if(state == F("addCocktails"))
     addCocktails();
-  else if(state == "addIngredients")
+  else if(state == F("addIngredients"))
     addIngredients();
-  else if(state == "confirmGoingBack")
+  else if(state == F("confirmGoingBack"))
     confirmGoingBack();
-  else if(state == "tankContentSet")
+  else if(state == F("tankContentSet"))
     tankContentSet();
-  else if(state == "fillTanks")
+  else if(state == F("fillTanks"))
     fillTanks();
-  else if(state == "masterOverview")
+  else if(state == F("masterOverview"))
     masterOverview();
-  else if(state == "machineFilled")
+  else if(state == F("machineFilled"))
     machineFilled();
-  else if(state == "cocktailSelection")
+  else if(state == F("cocktailSelection"))
     cocktailSelection();
-  else if(state == "customCocktailMenu")
+  else if(state == F("customCocktailMenu"))
     customCocktailMenu();
-  else if(state == "gameMenu")
+  else if(state == F("gameMenu"))
     gameMenu();
-  else if(state == "game")
+  else if(state == F("game"))
     game();
-  else if(state == "refillTanks")
+  else if(state == F("refillTanks"))
     refillTanks();
-  else if(state == "error")
+  else if(state == F("questionEmptyTanks"))
+    questionEmptyTanks();
+  else if(state == F("emptyTanksGlassSize"))
+    emptyTanksGlassSize();
+  else if(state == F("emptyTanksMenu"))
+    emptyTanksMenu();
+  else if(state == F("cleaningMenu"))
+    cleaningMenu();
+  else if(state == F("error"))
     error();
 }
 
@@ -299,20 +311,20 @@ void start(){
 
   numOfChoices = 2;
 
-  print("Waehle eine der folgenden Moeglich-");
-  print("keiten die Maschine zu befuellen:");
+  print(F("Waehle eine der folgenden Moeglich-"));
+  print(F("keiten die Maschine zu befuellen:"));
   addSpacingY(textChoiceSpacingY);
-  printChoice("Cocktails auswaehlen");
-  printChoice("Zutaten auswaehlen");
+  printChoice(F("Cocktails auswaehlen"));
+  printChoice(F("Zutaten auswaehlen"));
   while(true){
     focusedChoice = getTurnKnobIndex();
     focus();
 
     if(isOkButtonPressed()){
       if(focusedChoice == 0)
-        state = "addCocktails";
+        state = F("addCocktails");
       else if(focusedChoice == 1)
-        state = "addIngredients";
+        state = F("addIngredients");
         
       return;
     }
@@ -322,7 +334,7 @@ void start(){
 void restoreFromSDCard(){
   // Check if tankContents were saved
   if(!tankContentsSaved()){
-    state = "start";
+    state = F("start");
     return;
   }
 
@@ -331,11 +343,11 @@ void restoreFromSDCard(){
 
   numOfChoices = 2;
 
-  print("Es wurden Tankinhalte auf der SD Karte");
-  print("gespeichert. Daten wiederherstellen?");
+  print(F("Es wurden Tankinhalte auf der SD Karte"));
+  print(F("gespeichert. Daten wiederherstellen?"));
   addSpacingY(textChoiceSpacingY);
-  printChoice("Ja, wiederherstellen");
-  printChoice("Nein");
+  printChoice(F("Ja, wiederherstellen"));
+  printChoice(F("Nein"));
   while(true){
     focusedChoice = getTurnKnobIndex();
     focus();
@@ -344,9 +356,9 @@ void restoreFromSDCard(){
       if(focusedChoice == 0)
         downloadTankContentsFromSDCard(); // sets State
       else if(focusedChoice == 1){
-        File tankContentsTxt = SD.open("tanks.txt", FILE_WRITE | O_TRUNC);    // O_TRUNC deletes existing file content
+        File tankContentsTxt = SD.open(F("tanks.txt"), FILE_WRITE | O_TRUNC);    // O_TRUNC deletes existing file content
         tankContentsTxt.close();
-        state = "start";
+        state = F("start");
       }
         
       return;
@@ -374,7 +386,7 @@ void addCocktails(){
         printAddCocktailsMenu();
       }
       else if(focusedChoice == 0 && currentPage == 0){
-        state = "addIngredients";
+        state = F("addIngredients");
         return;
       }
 
@@ -398,11 +410,11 @@ void addCocktails(){
     }
 
     if(isBackButtonPressed()){
-      lastState = "addCocktails";
-      secondLastState = "start";
-      goingBackMessage = "Ja, alle Tanks werden geloescht";
+      lastState = F("addCocktails");
+      secondLastState = F("start");
+      goingBackMessage = F("Ja, alle Tanks werden geloescht");
 
-      state = "confirmGoingBack";
+      state = F("confirmGoingBack");
       return;
     }
   }
@@ -430,7 +442,7 @@ void addIngredients(){
         continue;
       }
       else if(focusedChoice == 0 && currentPage == 0){
-        state = "addCocktails";
+        state = F("addCocktails");
         return;
       }
 
@@ -448,7 +460,7 @@ void addIngredients(){
           chosenIngredients[i] = true;
           cs.addContent(ingredients[i]);
           if(numOfEmptyTanks == 0)
-            state = "tankContentSet";
+            state = F("tankContentSet");
           
           return;
         }
@@ -458,10 +470,10 @@ void addIngredients(){
     }
 
     if(isBackButtonPressed()){
-      lastState = "addIngredients";
-      secondLastState = "start";
-      goingBackMessage = "Ja, alle Tanks werden geloescht";
-      state = "confirmGoingBack";
+      lastState = F("addIngredients");
+      secondLastState = F("start");
+      goingBackMessage = F("Ja, alle Tanks werden geloescht");
+      state = F("confirmGoingBack");
       return;
     }
   }
@@ -473,9 +485,9 @@ void confirmGoingBack(){
 
   numOfChoices = 2;
 
-  print("Wirklich zurueckgehen?");
+  print(F("Wirklich zurueckgehen?"));
   addSpacingY(textChoiceSpacingY);
-  printChoice("Abbrechen");
+  printChoice(F("Abbrechen"));
   printChoice(goingBackMessage);
 
   while(true){
@@ -503,24 +515,24 @@ void tankContentSet(){
   updateAvailableCocktails();
   saveTankContentsToSD(state);
 
-  print("Die Tankinhalte sind jetzt festgelegt");
-  print("und wurden auf der SD-Karte gespeichert");
-  print("Es koennen nun folgende Cocktails");
-  print("zubereitet werden:");
+  print(F("Die Tankinhalte sind jetzt festgelegt"));
+  print(F("und wurden auf der SD-Karte gespeichert"));
+  print(F("Es koennen nun folgende Cocktails"));
+  print(F("zubereitet werden:"));
 
   addSpacingY(10);
   printAvailableCocktails();
   addSpacingY(10);
 
-  print("Die Maschine muss dafuer mit den");
-  print("folgenden Zutaten befuellt werden:");
+  print(F("Die Maschine muss dafuer mit den"));
+  print(F("folgenden Zutaten befuellt werden:"));
 
   addSpacingY(10);
   printTankContents();
   addSpacingY(textChoiceSpacingY);
 
   numOfChoices = 1;
-  printChoice("Weiter zur Befuellung der Maschine");
+  printChoice(F("Weiter zur Befuellung der Maschine"));
   
   
   while(true){
@@ -528,14 +540,14 @@ void tankContentSet(){
     focus();
     
     if(isOkButtonPressed()){
-      state = "fillTanks";
+      state = F("fillTanks");
       return;
     } else if(isBackButtonPressed()){
-      lastState = "tankContentSet";
-      secondLastState = "start";
-      goingBackMessage = "Ja, alle Tanks werden geloescht";
+      lastState = F("tankContentSet");
+      secondLastState = F("start");
+      goingBackMessage = F("Ja, alle Tanks werden geloescht");
 
-      state = "confirmGoingBack";
+      state = F("confirmGoingBack");
       return;
     }
   }
@@ -544,22 +556,22 @@ void tankContentSet(){
 void fillTanks(){
   String ingredient = cs.getTankContent(currentTankIndex);
   if(ingredient == ""){
-    state = "machineFilled";
+    state = F("machineFilled");
     currentTankIndex = 0;
     return;
   }
   mylcd.Fill_Screen(BLACK);
   resetGlobalVariables();
-  print("Fuelle den Tank direkt ueber dem Glas");
+  print(F("Fuelle den Tank direkt ueber dem Glas"));
   print("mit " + ingredient + ".");
-  print("Gefuellt bis zur Markierung:");
+  print(F("Gefuellt bis zur Markierung:"));
   numOfChoices = 5;
   addSpacingY(textChoiceSpacingY);
-  printChoice("1");
-  printChoice("2");
-  printChoice("3");
-  printChoice("4");
-  printChoice("5");
+  printChoice(F("1"));
+  printChoice(F("2"));
+  printChoice(F("3"));
+  printChoice(F("4"));
+  printChoice(F("5"));
 
   while(true){
     focusedChoice = getTurnKnobIndex();
@@ -570,16 +582,16 @@ void fillTanks(){
       cs.fillTankTo(currentTankIndex, fillingLevel);
 
       if(currentTankIndex == numOfTanks - 1){
-        state = "masterOverview";
+        state = F("masterOverview");
         currentTankIndex = 0;
         return;
       }
       currentTankIndex++;
       return;
     } else if(isBackButtonPressed()){
-      lastState = "fillTanks";
-      secondLastState = "start";
-      state = "confirmGoingBack";
+      lastState = F("fillTanks");
+      secondLastState = F("start");
+      state = F("confirmGoingBack");
       return;
     }
   }
@@ -591,27 +603,27 @@ void masterOverview(){
 
   saveTankContentsToSD(state);
 
-  print("Die Maschine ist jetzt bereit fuer");
-  print("die Party!");
-  print("Der jetzige Status ist auf der");
-  print("SD-Karte gespeichert.");
+  print(F("Die Maschine ist jetzt bereit fuer"));
+  print(F("die Party!"));
+  print(F("Der jetzige Status ist auf der"));
+  print(F("SD-Karte gespeichert."));
   addSpacingY(textChoiceSpacingY);
 
-  print("Die Tanks sind nun wie folgt gefuellt:");
+  print(F("Die Tanks sind nun wie folgt gefuellt:"));
 
   addSpacingY(textChoiceSpacingY);
   printTankContentsWithAmounts();
 
   numOfChoices = 1;
   addSpacingY(textChoiceSpacingY);
-  printChoice("Zum Party-Modus");
+  printChoice(F("Zum Party-Modus"));
 
   while(true){
     focusedChoice = getTurnKnobIndex();
     focus();
 
     if(isOkButtonPressed()){
-      state = "machineFilled";
+      state = F("machineFilled");
       return;
     }
   }
@@ -626,14 +638,14 @@ void machineFilled(){
 
   initChosenIngredientsGame();
 
-  print("Waehle eine der folgenden Optionen:");
+  print(F("Waehle eine der folgenden Optionen:"));
 
   numOfChoices = 4;
   addSpacingY(textChoiceSpacingY);
-  printChoice("Cocktails auswaehlen");
-  printChoice("Persoenlicher Cocktail");
-  printChoice("Spielmodus");
-  printChoice("Tanks nachfuellen");
+  printChoice(F("Cocktails auswaehlen"));
+  printChoice(F("Persoenlicher Cocktail"));
+  printChoice(F("Spielmodus"));
+  printChoice(F("Tanks nachfuellen"));
 
   while(true){
     focusedChoice = getTurnKnobIndex();
@@ -641,14 +653,18 @@ void machineFilled(){
 
     if(isOkButtonPressed()){
       if(focusedChoice == 0)
-        state = "cocktailSelection";
+        state = F("cocktailSelection");
       else if(focusedChoice == 1)
-        state = "customCocktailMenu";
+        state = F("customCocktailMenu");
       else if(focusedChoice == 2)
-        state = "gameMenu";
+        state = F("gameMenu");
       else if(focusedChoice == 3)
-        state = "refillTanks";
+        state = F("refillTanks");
 
+      return;
+    }
+    else if(isBackButtonPressed()){
+      state = F("questionEmptyTanks");
       return;
     }
   }
@@ -660,10 +676,10 @@ void cocktailSelection(){
 
   updateAvailableCocktails();
 
-  print("Waehle einen der folgenden Cocktails");
+  print(F("Waehle einen der folgenden Cocktails"));
 
   addSpacingY(textChoiceSpacingY);
-  printChoice("Zurueck");
+  printChoice(F("Zurueck"));
   numOfChoices = 1;
 
 
@@ -684,7 +700,7 @@ void cocktailSelection(){
 
     if(isOkButtonPressed()){
       if(focusedChoice == 0){
-        state = "machineFilled";
+        state = F("machineFilled");
         return;
       }
 
@@ -695,7 +711,7 @@ void cocktailSelection(){
         if(!availableCocktails[i]) continue;
 
         if(index == currentIndex) {
-          lastState = "cocktailSelection";
+          lastState = F("cocktailSelection");
           confirmMakeCocktail(cocktails[i]);
           
           return;
@@ -721,11 +737,11 @@ void customCocktailMenu(){
     if(isOkButtonPressed()){
       if(focusedChoice == 0){
         if(numIngredsCustomCocktail > 0){
-          lastState = "customCocktailMenu";
+          lastState = F("customCocktailMenu");
           confirmMakeCocktail(customCocktail);
         }
         
-        state = "machineFilled";
+        state = F("machineFilled");
         return;
       }
 
@@ -744,7 +760,7 @@ void customCocktailMenu(){
           getCustomCocktailAmount();
 
           if(numIngredsCustomCocktail == numOfTanks || currentGlassCapacity == 0){
-            lastState = "customCocktailMenu";
+            lastState = F("customCocktailMenu");
             confirmMakeCocktail(customCocktail);
           }
     
@@ -769,11 +785,11 @@ void gameMenu(){
     if(isOkButtonPressed()){
       // "Abbrechen" option
       if(focusedChoice == 0){
-        state = "machineFilled";
+        state = F("machineFilled");
         return;
       } // "Spiel staten" option
       else if(focusedChoice == numOfChoices - 1 && numOfIngredsGame > 0){
-        state = "game";
+        state = F("game");
         return;
       }
 
@@ -793,7 +809,7 @@ void gameMenu(){
           numOfIngredsGame++;
 
           if(numOfIngredsGame == numOfTanks)
-            state = "game";
+            state = F("game");
     
           return;
         }
@@ -808,14 +824,14 @@ void game(){
   mylcd.Fill_Screen(BLACK);
   resetGlobalVariables();
 
-  print("Spielmodus");
+  print(F("Spielmodus"));
   addSpacingY(textChoiceSpacingY);
-  print("Druecke nun den Abzug");
+  print(F("Druecke nun den Abzug"));
 
   numOfChoices = 2;
   addSpacingY(textChoiceSpacingY);
-  printChoice("Abzug");
-  printChoice("Spiel abbrechen");
+  printChoice(F("Abzug"));
+  printChoice(F("Spiel abbrechen"));
 
   while(true){
     focusedChoice = getTurnKnobIndex();
@@ -823,7 +839,7 @@ void game(){
 
     if(isOkButtonPressed()){
       if(focusedChoice == 1){
-        state = "machineFilled";
+        state = F("machineFilled");
         return;
       }
 
@@ -838,10 +854,10 @@ void refillTanks(){
   mylcd.Fill_Screen(BLACK);
   resetGlobalVariables();
 
-  print("Waehle den Tank der nachgefuellt wird");
+  print(F("Waehle den Tank der nachgefuellt wird"));
 
   addSpacingY(textChoiceSpacingY);
-  printChoice("Zurueck");
+  printChoice(F("Zurueck"));
   numOfChoices = 1;
   for(int i = 0; i < numOfTanks; i++){
     String tankContent = cs.getTankContent(i);
@@ -860,7 +876,7 @@ void refillTanks(){
 
     if(isOkButtonPressed()){
       if(focusedChoice == 0)
-        state = "machineFilled";
+        state = F("machineFilled");
 
       int tankIndex = focusedChoice - 1;    // because of "Zurueck" Option
       int currentIndex = 0;
@@ -883,9 +899,138 @@ void refillTanks(){
   }
 }
 
-void error(){
+void questionEmptyTanks(){
   mylcd.Fill_Screen(BLACK);
-  print("ERROR");
+  resetGlobalVariables();
+
+  print(F("Tanks leeren?"));
+  addSpacingY(textChoiceSpacingY);
+  print(F("Sollen alle Tanks geleert werden?"));
+  addSpacingY(textChoiceSpacingY);
+
+  numOfChoices = 2;
+  printChoice(F("Ja, alle Tanks leeren"));
+  printChoice(F("Abbrechen"));
+  
+  printTankContentsWithAmountsBoxed();
+
+  while(true){
+    focusedChoice = getTurnKnobIndex();
+    focus();
+
+    if(isOkButtonPressed()){
+      if(focusedChoice == 0)
+        state = F("emptyTanksGlassSize");
+      else if(focusedChoice == 1)
+        state = F("machineFilled");
+
+      return;
+    }
+  }
+}
+
+void emptyTanksGlassSize(){
+  mylcd.Fill_Screen(BLACK);
+  resetGlobalVariables();
+
+  print(F("Tanks leeren"));
+  addSpacingY(textChoiceSpacingY);
+  print(F("Wie viel ml passen in das Glas,"));
+  print(F("dass zum entleeren benutzt wird?"));
+
+  addSpacingY(textChoiceSpacingY);
+  numOfChoices = 6;
+  printChoice(F("Abbrechen"));
+  printChoice(F("100ml"));   // 1
+  printChoice(F("150ml"));   // 2
+  printChoice(F("200ml"));   // 3
+  printChoice(F("250ml"));   // 4
+  printChoice(F("300ml"));   // 5
+
+  printTankContentsWithAmountsBoxed();
+
+  while(true){
+    focusedChoice = getTurnKnobIndex();
+    focus();
+
+    if(isOkButtonPressed()){
+      if(focusedChoice == 0){
+        state = F("machineFilled");
+        return;
+      }
+
+      currentGlassCapacity = 10 + (focusedChoice - 1) * 5;
+      state = F("emptyTanksMenu");
+
+      return;
+    }
+  }
+}
+
+void emptyTanksMenu(){
+  for(int i = 0; i < numOfTanks; i++){
+    emptyTankMenu(i);
+  }
+  deleteTANKS_txt();
+  cs.emptyTanks();
+
+  mylcd.Fill_Screen(BLACK);
+  resetGlobalVariables();
+
+  print(F("Alle Tanks wurden geleert"));
+  addSpacingY(textChoiceSpacingY);
+  print(F("Moechtest du nun:"));
+
+  addSpacingY(textChoiceSpacingY);
+  numOfChoices = 2;
+  printChoice(F("Zum Reiningungsmodus"));
+  printChoice(F("Zum Hauptmenue zurueckgehen"));
+
+  while(true){
+    focusedChoice = getTurnKnobIndex();
+    focus();
+    if(isOkButtonPressed()){
+      if(focusedChoice == 0)
+        state = F("cleaningMenu");
+      else if(focusedChoice == 1)
+        state = F("start");
+      
+      return;
+    }
+  }
+}
+
+void cleaningMenu(){
+  fillTanksWithCleaningFluid();
+  emptyTanksWithCleaningFluid();
+
+  mylcd.Fill_Screen(BLACK);
+  resetGlobalVariables();
+
+  print(F("Alle Tanks wurden gereinigt"));
+  addSpacingY(textChoiceSpacingY);
+  print(F("Du kannst nun die Maschine ausschalten"));
+  print(F("oder zum Hauptmenue zurueckgehen"));
+  addSpacingY(textChoiceSpacingY);
+  numOfChoices = 1;
+  printChoice(F("Zum Hauptmenue zurueckgehen"));
+
+  while(true){
+    focusedChoice = getTurnKnobIndex();
+    focus();
+    if(isOkButtonPressed()){
+        state = F("start");
+      
+      return;
+    }
+  }
+}
+
+void error(){
+  resetGlobalVariables();
+  mylcd.Fill_Screen(BLACK);
+
+  print(F("ERROR"));
   while(true){
 
   }
@@ -898,15 +1043,15 @@ void okButtonPress(){
   if((millis() - timeOfLastDebouncePress) > delayOfDebouncePress){
       timeOfLastDebouncePress = millis();
 
-      inputState = 2;
-      Serial.println("OK-Button: pressed");
+      inputState = 3;
+      Serial.println(F("OK-Button: pressed"));
   }
   
 }
 
 void backButtonPress(){
-  inputState = 3;
-  Serial.println("Back-Button: pressed");
+  inputState = 4;
+  Serial.println(F("Back-Button: pressed"));
 }
 
 void knobTurn(){
@@ -918,17 +1063,141 @@ void knobTurn(){
       int dtState = digitalRead(pinDT);
 
       if(dtState != clkState){          
-          inputState = 1;
-          Serial.println("Knob: positive rotation");
+          inputState = 2;
+          Serial.println(F("Knob: positive rotation"));
       } else if(dtState == clkState){
-          inputState = -1;     
-          Serial.println("Knob: negative rotation");
+          inputState = 1;     
+          Serial.println(F("Knob: negative rotation"));
       }
     }
 }
 
 
 // MENU PRINT FUNCTIONS
+void fillTanksWithCleaningFluid(){
+  // HWCMD: MOVE1
+  currentTankIndex = 0;
+  for(byte i = 0; i < numOfTanks; i++){
+    mylcd.Fill_Screen(BLACK);
+    resetGlobalVariables();
+
+    Serial.print(F("Current Tank Index: "));
+    Serial.println(currentTankIndex);
+
+    print(F("Fuellen der Tanks"));
+    addSpacingY(textChoiceSpacingY);
+    print(F("Fuelle nun Reinigungsfluessigkeit"));
+    print(F("in den Tank ueber dem Glas"));
+    addSpacingY(textChoiceSpacingY);
+
+    numOfChoices = 1;
+    printChoice(F("Weiter"));
+
+    while(true){
+      focusedChoice = getTurnKnobIndex();
+      focus();
+
+      if(isOkButtonPressed()){
+        if(currentTankIndex != numOfTanks - 1)
+          currentTankIndex++;
+        // HWCMD: MOVE
+        break;
+      }
+    }
+  }
+}
+
+void emptyTanksWithCleaningFluid(){
+  for(byte i = 0; i < numOfTanks; i++){
+    mylcd.Fill_Screen(BLACK);
+    resetGlobalVariables();
+
+    Serial.print(F("Current Tank Index: "));
+    Serial.println(currentTankIndex);
+
+    print(F("Leeren der Tanks"));
+    addSpacingY(textChoiceSpacingY);
+    print(F("Stelle nun ein Glas in die Maschine"));
+    addSpacingY(textChoiceSpacingY);
+
+    numOfChoices = 1;
+    printChoice(F("Tank entleeren"));
+
+    while(true){
+      focusedChoice = getTurnKnobIndex();
+      focus();
+
+      if(isOkButtonPressed()){
+        // HWCMD: EMPTY 10cl
+        break;
+      }
+    }
+
+    tankEmptyQuestionCleaning();
+
+    // HWCMD MOVE
+    if(currentTankIndex > 0)
+      currentTankIndex--;
+  }
+}
+
+void tankEmptyQuestionCleaning(){
+  while(true){
+    mylcd.Fill_Screen(BLACK);
+    resetGlobalVariables();
+
+    print(F("Ist der Tank nun leer?"));
+    addSpacingY(textChoiceSpacingY);
+    numOfChoices = 2;
+    printChoice(F("Ja"));
+    printChoice(F("Nein, Tank weiter leeren"));
+
+    while(true){
+      focusedChoice = getTurnKnobIndex();
+      focus();
+
+      if(isOkButtonPressed()){
+        if(focusedChoice == 0) return;
+
+        // HWCMD: EMPTY 10cl
+        break;
+      }
+    }
+  }
+}
+
+void emptyTankMenu(int tankIndex){
+  String tankContent = cs.getTankContent(tankIndex);
+  if(tankContent == "") return;
+    
+  // empty Tank while not empty
+  while(cs.getTankFillingLevel(tankIndex) > 0){
+    mylcd.Fill_Screen(BLACK);
+    resetGlobalVariables();
+
+    print(tankContent + F(" Tank leeren:"));
+    addSpacingY(textChoiceSpacingY);
+
+    numOfChoices = 1;
+    printChoice(F("Weiter, Glas leer!"));
+
+    //print("Achte darauf, dass ein Glas mit der");
+    //print("angegebenen Kapazitaet in der Machine ist!");
+
+    printTankContentsWithAmountsBoxed();
+
+    while(true){
+      focusedChoice = getTurnKnobIndex();
+      focus();
+
+      if(isOkButtonPressed()){
+        cs.withdraw(tankIndex, min(cs.getTankFillingLevel(tankIndex), currentGlassCapacity));
+        break;
+      }
+    }
+  }
+}
+
 void getCustomCocktailAmount(){
   resetGlobalVariables();
 
@@ -974,7 +1243,7 @@ void printGetCustomCocktailAmount(){
   if(currentPage == 0){
     String currentIngredientName = customCocktail.getIngredient(numIngredsCustomCocktail - 1).getName();
     print("Wie viele cl von " + currentIngredientName);
-    print("moechtest du in deinem Cocktail?");
+    print(F("moechtest du in deinem Cocktail?"));
     addSpacingY(textChoiceSpacingY);
   }
 
@@ -989,13 +1258,13 @@ void printGetCustomCocktailAmount(){
 void printCustomCocktailMenu(){
   mylcd.Fill_Screen(BLACK);
 
-  print("Waehle eine Zutat fuer deinen");
-  print("persoenlichen Cocktail:");
+  print(F("Waehle eine Zutat fuer deinen"));
+  print(F("persoenlichen Cocktail:"));
   addSpacingY(textChoiceSpacingY);
   if(numIngredsCustomCocktail > 0)
-    printChoice("Cocktail zubereiten");
+    printChoice(F("Cocktail zubereiten"));
   else
-    printChoice("Abbrechen");
+    printChoice(F("Abbrechen"));
   
   numOfChoices = 1;
 
@@ -1014,13 +1283,13 @@ void printCustomCocktailMenu(){
 void printGameMenu(){
   mylcd.Fill_Screen(BLACK);
 
-  print("Willkommen im Spielmodus!");
+  print(F("Willkommen im Spielmodus!"));
   addSpacingY(textChoiceSpacingY);
-  print("Waehle zuerst Zutaten fuer die Shots:");
+  print(F("Waehle zuerst Zutaten fuer die Shots:"));
   addSpacingY(textChoiceSpacingY);
 
   numOfChoices = 1;
-  printChoice("Abbrechen");
+  printChoice(F("Abbrechen"));
 
   printChosenIngredsGameBoxed();
 
@@ -1033,7 +1302,7 @@ void printGameMenu(){
   }
 
   if(numOfIngredsGame > 0){
-    printChoice("Spiel starten");
+    printChoice(F("Spiel starten"));
     numOfChoices++;
   }
 }
@@ -1050,23 +1319,23 @@ void printGameResult(){
 }
 
 void printShotReceived(){
-  print("Spielmodus");
+  print(F("Spielmodus"));
   addSpacingY(textChoiceSpacingY);
 
   int randomNum = random(numOfIngredsGame);
   Ingredient shotIngredient = chosenIngredientsGame[randomNum];
-  print("Pech gehabt, du bekommst einen Shot:");
+  print(F("Pech gehabt, du bekommst einen Shot:"));
   addSpacingY(textChoiceSpacingY);
   print(shotIngredient.getName());
 
   addSpacingY(textChoiceSpacingY);
-  print("Achte darauf, dass sich ein Glas");
-  print("in der Maschine befindet");
+  print(F("Achte darauf, dass sich ein Glas"));
+  print(F("in der Maschine befindet"));
   addSpacingY(textChoiceSpacingY);
 
   addSpacingY(textChoiceSpacingY);
   numOfChoices = 1;
-  printChoice("Shot zubereiten");
+  printChoice(F("Shot zubereiten"));
 
   while(true){
     focusedChoice = getTurnKnobIndex();
@@ -1074,27 +1343,27 @@ void printShotReceived(){
 
     if(isOkButtonPressed()){
       makeShot(shotIngredient);
-      state = "game";
+      state = F("game");
       return;
     }
   }
 }
 
 void printNoShotReceived(){
-  print("Spielmodus");
+  print(F("Spielmodus"));
   addSpacingY(textChoiceSpacingY);
-  print("Glueck gehabt!");
+  print(F("Glueck gehabt!"));
 
   addSpacingY(textChoiceSpacingY);
   numOfChoices = 1;
-  printChoice("Weiter");
+  printChoice(F("Weiter"));
 
   while(true){
     focusedChoice = getTurnKnobIndex();
     focus();
 
     if(isOkButtonPressed()){
-      state = "game";
+      state = F("game");
       return;
     }
   }
@@ -1109,8 +1378,8 @@ void notEnoughContentMenu(String ingredientName){
   
   addSpacingY(textChoiceSpacingY);
   numOfChoices = 2;
-  printChoice(ingredientName + " Tank auffuellen");
-  printChoice("Anderen Cocktail waehlen");
+  printChoice(ingredientName + F(" Tank auffuellen"));
+  printChoice(F("Anderen Cocktail waehlen"));
 
   while(true){
     focusedChoice = getTurnKnobIndex();
@@ -1146,7 +1415,7 @@ void notEnoughContentGame(String ingredientName){
   addSpacingY(textChoiceSpacingY);
   numOfChoices = 2;
   printChoice(ingredientName + " Tank auffuellen");
-  printChoice("Zum Hauptmenue");
+  printChoice(F("Zum Hauptmenue"));
 
   while(true){
     focusedChoice = getTurnKnobIndex();
@@ -1165,7 +1434,7 @@ void notEnoughContentGame(String ingredientName){
         refillTank(tankIndex);
       }
       else if(focusedChoice == 1)
-        state = "machineFilled";
+        state = F("machineFilled");
 
       return;
     }
@@ -1177,9 +1446,9 @@ void printAddCocktailsMenu(){
   updatePossibleCocktails();
 
   if(currentPage == 0){
-    print("Waehle eine der folgenden Cocktails aus:");
+    print(F("Waehle eine der folgenden Cocktails aus:"));
     addSpacingY(textChoiceSpacingY);
-    printChoice("Zutaten hinzufuegen");
+    printChoice(F("Zutaten hinzufuegen"));
   }
 
   for(int i = 0; i < maxNumOfCocktails; i++){
@@ -1199,10 +1468,10 @@ void confirmAddCocktail(Cocktail cocktail){
   mylcd.Fill_Screen(BLACK);
   resetGlobalVariables();
 
-  print(cocktail.getName() + " hinzufuegen?");
+  print(cocktail.getName() + F(" hinzufuegen?"));
   addSpacingY(textChoiceSpacingY);
   // Maybe insert short info about the cocktail here
-  print("Enthaltene Zutaten:");
+  print(F("Enthaltene Zutaten:"));
 
   for(int i = 0; i < numOfTanks; i++){
     Ingredient ingredient = cocktail.getIngredient(i);
@@ -1213,8 +1482,8 @@ void confirmAddCocktail(Cocktail cocktail){
 
   addSpacingY(textChoiceSpacingY);
   numOfChoices = 2;
-  printChoice("Ja, Cocktail hinzufuegen");
-  printChoice("Abbrechen");
+  printChoice(F("Ja, Cocktail hinzufuegen"));
+  printChoice(F("Abbrechen"));
 
   while(true){
     focusedChoice = getTurnKnobIndex();
@@ -1225,7 +1494,7 @@ void confirmAddCocktail(Cocktail cocktail){
         addCocktail(cocktail);
         updatePossibleCocktails();
         if(numOfEmptyTanks == 0 || !arePossibleCocktails())
-          state = "tankContentSet";
+          state = F("tankContentSet");
       }
       
       return;
@@ -1237,25 +1506,25 @@ void confirmMakeCocktail(Cocktail cocktail){
   resetGlobalVariables();
   mylcd.Fill_Screen(BLACK);
 
-  print(cocktail.getName() + " zubereiten?");
+  print(cocktail.getName() + F(" zubereiten?"));
   addSpacingY(textChoiceSpacingY);
-  print("Achte darauf, dass ein Glas");
-  print("in der Maschine steht!");
+  print(F("Achte darauf, dass ein Glas"));
+  print(F("in der Maschine steht!"));
   addSpacingY(textChoiceSpacingY);
 
-  print("Enthaltene Zutaten:");
+  print(F("Enthaltene Zutaten:"));
 
   for(int i = 0; i < numOfTanks; i++){
     Ingredient ingredient = cocktail.getIngredient(i);
     if(ingredient.getName() == "") break;
     
-    print(ingredient.getName() + ": " + ingredient.getAmount() + "cl");
+    print(ingredient.getName() + ": " + ingredient.getAmount() + F("cl"));
   }
 
   addSpacingY(textChoiceSpacingY);
   numOfChoices = 2;
-  printChoice("Ja, Cocktail zubereiten");
-  printChoice("Abbrechen");
+  printChoice(F("Ja, Cocktail zubereiten"));
+  printChoice(F("Abbrechen"));
 
   while(true){
     focusedChoice = getTurnKnobIndex();
@@ -1275,9 +1544,9 @@ void printAddIngredientsMenu(){
   mylcd.Fill_Screen(BLACK);
 
   if(currentPage == 0){
-    print("Waehle eine der folgenden Zutaten aus:");
+    print(F("Waehle eine der folgenden Zutaten aus:"));
     addSpacingY(textChoiceSpacingY);
-    printChoice("Cocktails hinzufuegen");
+    printChoice(F("Cocktails hinzufuegen"));
   }
 
   for(int i = 0; i < maxNumOfIngredients; i++){
@@ -1335,21 +1604,21 @@ void cocktailDoneMenu(Cocktail cocktail){
   mylcd.Fill_Screen(BLACK);
   resetGlobalVariables();
 
-  print("Der Cocktail ist nun zubereitet");
+  print(F("Der Cocktail ist nun zubereitet"));
   addSpacingY(textChoiceSpacingY);
-  print("Du kannst ihn jetzt aus der");
-  print("Maschine nehmen");
+  print(F("Du kannst ihn jetzt aus der"));
+  print(F("Maschine nehmen"));
 
   addSpacingY(textChoiceSpacingY);
   numOfChoices = 1;
-  printChoice("Weiter");
+  printChoice(F("Weiter"));
 
   while(true){
     focusedChoice = getTurnKnobIndex();
     focus();
 
     if(isOkButtonPressed()){
-      state = "cocktailSelection";
+      state = F("cocktailSelection");
       return;
     }
   }
@@ -1359,14 +1628,14 @@ void ShotDoneMenu(Ingredient shotIngredient){
   mylcd.Fill_Screen(BLACK);
   resetGlobalVariables();
 
-  print("Der Shot ist nun zubereitet");
+  print(F("Der Shot ist nun zubereitet"));
   addSpacingY(textChoiceSpacingY);
-  print("Du kannst ihn jetzt aus der");
-  print("Maschine nehmen");
+  print(F("Du kannst ihn jetzt aus der"));
+  print(F("Maschine nehmen"));
 
   addSpacingY(textChoiceSpacingY);
   numOfChoices = 1;
-  printChoice("Weiter");
+  printChoice(F("Weiter"));
 
   while(true){
     focusedChoice = getTurnKnobIndex();
@@ -1386,7 +1655,7 @@ void refillTank(int tankIndex){
   String tankContent = cs.getTankContent(tankIndex);
   int tankFillingLevel = cs.getTankFillingLevel(tankIndex);
 
-  print("Fuelle den Tank direkt ueber dem Glas");
+  print(F("Fuelle den Tank direkt ueber dem Glas"));
   print("mit " + tankContent + ".");
   addSpacingY(textChoiceSpacingY);
 
@@ -1448,9 +1717,9 @@ void printTankContents(){
       currentStringLength += addedLength;
 
       Serial.print(newIngredientStr);
-      Serial.print(" : length: ");
+      Serial.print(F(" : length: "));
       Serial.print(addedLength);
-      Serial.print(" => ");
+      Serial.print(F(" => "));
       Serial.println(currentStringLength);
 
       tankContentsStr += ", " + newIngredientStr;
@@ -1472,7 +1741,7 @@ void printTankContentsWithAmounts(){
     String tankContent = cs.getTankContent(i) + ": ";
     String tankAmountStr = String(cs.getTankFillingLevel(i)) + "cl";
     if(cs.getTankContent(i) == "")
-      tankContent = "leer";
+      tankContent = F("leer");
 
     mylcd.Print_String(tankAmountStr, 250, textPosY);
     print(tankContent);
@@ -1487,7 +1756,7 @@ void printTankContentsWithAmountsBoxed(){
 
   int textPosXTanks = textPaddingX + separatorLineWideX;
   int textPosYTanks = textPaddingY + seperatorLineWideY;
-  mylcd.Print_String("Tanks:", textPosXTanks , textPosYTanks);
+  mylcd.Print_String(F("Tanks:"), textPosXTanks , textPosYTanks);
   for(int i = 0; i < numOfTanks; i++){
     textPosYTanks += textSpacingY;
     String tankContent = cs.getTankContent(i) == "" ? "leer" : cs.getTankContent(i);
@@ -1507,7 +1776,7 @@ void printCustomCocktailBoxed(){
 
   int textPosXTanks = textPaddingX + separatorLineWideX;
   int textPosYTanks = textPaddingY + seperatorLineWideY;
-  mylcd.Print_String("Zutaten:", textPosXTanks , textPosYTanks);
+  mylcd.Print_String(F("Zutaten:"), textPosXTanks , textPosYTanks);
   for(int i = 0; i < numIngredsCustomCocktail; i++){
     textPosYTanks += textSpacingY;
     Ingredient ingredient = customCocktail.getIngredient(i);
@@ -1527,7 +1796,7 @@ void printChosenIngredsGameBoxed(){
 
   int textPosXTanks = textPaddingX + separatorLineWideX;
   int textPosYTanks = textPaddingY + seperatorLineWideY;
-  mylcd.Print_String("Shots:", textPosXTanks , textPosYTanks);
+  mylcd.Print_String(F("Shots:"), textPosXTanks , textPosYTanks);
   for(int i = 0; i < numOfIngredsGame; i++){
     textPosYTanks += textSpacingY;
     Ingredient ingredient = chosenIngredientsGame[i];
@@ -1542,7 +1811,8 @@ void printChosenIngredsGameBoxed(){
 
 // HELPER FUCTIONS
 void addIngredientNameToCustomCocktail(String ingredientName){
-  Serial.println("addIngredient to customCocktail: " + ingredientName);
+  Serial.println(F("addIngredient to customCocktail: "));
+  Serial.println(ingredientName);
 
   customCocktail.setIngredientName(numIngredsCustomCocktail, ingredientName);
 
@@ -1557,7 +1827,7 @@ void clearCustomCocktail(){
     ingredients[i] = Ingredient();
   }
 
-  customCocktail = Cocktail("Persoenlicher Cocktail", ingredients);
+  customCocktail = Cocktail(F("Persoenlicher Cocktail"), ingredients, false);
   numIngredsCustomCocktail = 0;
   currentGlassCapacity = maxGlassCapacity;
 }
@@ -1574,7 +1844,7 @@ void makeCocktail(Cocktail cocktail){
 
       int tankFilllingLevel = cs.getTankFillingLevel(j);
       // not enough content to make Cocktail
-      if(tankFilllingLevel - ingredient.getAmount() < 0){
+      if(tankFilllingLevel < ingredient.getAmount()){
         notEnoughContentMenu(ingredient.getName());
         return;
       }
@@ -1590,8 +1860,7 @@ void makeCocktail(Cocktail cocktail){
     for(int j = 0;  j < numOfTanks; j++){
       if(cs.getTankContent(j) != ingredient.getName()) continue;
 
-      int tankFilllingLevel = cs.getTankFillingLevel(j);
-      cs.fillTankTo(j, tankFilllingLevel - ingredient.getAmount());
+      cs.withdraw(j, ingredient.getAmount());
       // MOVE MACHINE
     }
   }
@@ -1608,7 +1877,7 @@ void makeShot(Ingredient shotIngredient){
 
     int tankFilllingLevel = cs.getTankFillingLevel(i);
     // not enough content to make Cocktail
-    if(tankFilllingLevel - shotIngredient.getAmount() < 0){
+    if(tankFilllingLevel < shotIngredient.getAmount()){
       notEnoughContentGame(shotIngredient.getName());
       return;
     }
@@ -1619,8 +1888,7 @@ void makeShot(Ingredient shotIngredient){
   // loop through tanks
   for(int j = 0;  j < numOfTanks; j++){
     if(cs.getTankContent(j) != shotIngredient.getName()) continue;
-    int tankFilllingLevel = cs.getTankFillingLevel(j);
-    cs.fillTankTo(j, tankFilllingLevel - shotIngredient.getAmount());
+    cs.withdraw(j, shotIngredient.getAmount());
     // MOVE MACHINE
   }
   
@@ -1758,7 +2026,7 @@ void printChoice(String message){
 void printChoiceToPages(String message){
   // print option to go to previous page
   if(currentPage != 0 && !previousPageOptionPrinted){
-    printChoice("Vorherige Seite");
+    printChoice(F("Vorherige Seite"));
     previousPageOptionPrinted = true;
     return;
   }
@@ -1781,7 +2049,7 @@ void printChoiceToPages(String message){
   if(textPosY >= choiceMaxPosY){
     if(nextPageOptionPrinted || numOfPages == maxNumOfPages) return;
 
-    printChoice("Naechste Seite");
+    printChoice(F("Naechste Seite"));
     numOfPages++;
     numOfChoices = currentPage == 0 ? numOfChoicesOnPage[currentPage] + 1 : numOfChoicesOnPage[currentPage] + 2;  // one more choice: additional prev. Page Option + next Page option
     nextPageOptionPrinted = true;
@@ -1822,12 +2090,12 @@ void focus(){
 }
 
 int getTurnKnobIndex(){
-  if (counter < numOfChoices-1 && inputState == 1){
+  if (counter < numOfChoices-1 && inputState == 2){
     counter++;
     Serial.println(counter);
     inputState = 0;
   }
-  else if (counter > 0 && inputState == -1){
+  else if (counter > 0 && inputState == 1){
     counter --;
     Serial.println(counter);
     inputState = 0;
@@ -1837,8 +2105,8 @@ int getTurnKnobIndex(){
 }
 
 bool isOkButtonPressed(){
-  // check if Ok-Button is pressed, maybe implement a short block time after the button was pressed
-  if(inputState == 2){
+  // check if Ok-Button is pressed
+  if(inputState == 3){
     inputState = 0;
     return true;
   }
@@ -1847,7 +2115,7 @@ bool isOkButtonPressed(){
 
 bool isBackButtonPressed(){
   // check if Back-Button is pressed, maybe implement a short block time after the button was pressed
-  if(inputState == 3){
+  if(inputState == 4){
     inputState = 0;
     return true;
   }
@@ -1879,15 +2147,15 @@ void resetGlobalVariablesForPage(){
 
 // SD Card
 bool tankContentsSaved(){
-  File tankContentsTxt = SD.open("tanks.txt");
+  File tankContentsTxt = SD.open(F("tanks.txt"));
   if(!tankContentsTxt){
     // if the file didn't open, print an error:
-    Serial.println("error opening tanks.txt");
+    Serial.println(F("error opening tanks.txt"));
     state = "error";
     return;
   }
 
-  Serial.println("Check if tank contents were saved");
+  Serial.println(F("Check if tank contents were saved"));
 
   bool tankContentsSaved = tankContentsTxt.available();
   tankContentsTxt.close();
@@ -1896,27 +2164,27 @@ bool tankContentsSaved(){
 }
 
 bool initializeSDCard(){
-  Serial.print("Initializing SD card...");
+  Serial.print(F("Initializing SD card..."));
   if (!SD.begin(53)) {
-    Serial.println("initialization failed!");
-    state = "error";
+    Serial.println(F("initialization failed!"));
+    state = F("error");
     return false;
   }
-  Serial.println("initialization done.");
+  Serial.println(F("initialization done."));
   return true;
 }
 
 // Format: name, ingredient1, amount1, ingredient2, amount2, ..., ingredientn, amountn,;
 void downloadCocktailsFromSD(){
-  File cocktailTxt = SD.open("cocktail.txt");
+  File cocktailTxt = SD.open(F("cocktail.txt"));
   if(!cocktailTxt){
     // if the file didn't open, print an error:
-    Serial.println("error opening cocktail.txt");
-    state = "error";
+    Serial.println(F("error opening cocktail.txt"));
+    state = F("error");
     return;
   }
   
-  Serial.println("downloading Cocktails");
+  Serial.println(F("downloading Cocktails"));
 
   for(int i = 0; i < maxNumOfCocktails; i++){
     // name of Cocktail
@@ -1953,8 +2221,17 @@ void downloadCocktailsFromSD(){
         ingredients[j + 1] = Ingredient();
     }
 
+    // check if cocktail should be mixed
+    String mixStr = "";
+    while (cocktailTxt.available()){
+      char currentChar = cocktailTxt.read();
+      if(currentChar == ';') break;
+      mixStr += currentChar;
+    }
+    bool mix = (mixStr == F("Ja"));
+
     // Save Cocktail
-    cocktails[i] = Cocktail(name, ingredients);
+    cocktails[i] = Cocktail(name, ingredients, mix);
     if(i != maxNumOfCocktails - 1)
       cocktails[i + 1] = Cocktail();
   }
@@ -1972,15 +2249,15 @@ void downloadCocktailsFromSD(){
 }
 
 void downloadIngredientsFromSD(){
-  File ingredientsTxt = SD.open("ingred.txt");
+  File ingredientsTxt = SD.open(F("ingred.txt"));
   if(!ingredientsTxt){
     // if the file didn't open, print an error:
-    Serial.println("error opening ingred.txt");
-    state = "error";
+    Serial.println(F("error opening ingred.txt"));
+    state = F("error");
     return;
   }
   
-  Serial.println("downloading Ingredients");
+  Serial.println(F("downloading Ingredients"));
 
   for(int i = 0; i < maxNumOfIngredients; i++){
     String name = "";
@@ -2001,11 +2278,11 @@ void downloadIngredientsFromSD(){
 }
 
 void downloadTankContentsFromSDCard(){
-  File tankContentsTxt = SD.open("tanks.txt");
+  File tankContentsTxt = SD.open(F("tanks.txt"));
   if(!tankContentsTxt){
     // if the file didn't open, print an error:
-    Serial.println("error opening tanks.txt");
-    state = "error";
+    Serial.println(F("error opening tanks.txt"));
+    state = F("error");
     return;
   }
 
@@ -2029,7 +2306,7 @@ void downloadTankContentsFromSDCard(){
     }
 
     // Save TanksContents
-    if(ingredientName == "leer")
+    if(ingredientName == F("leer"))
       ingredientName = "";
     
     cs.addContent(ingredientName);
@@ -2050,22 +2327,22 @@ void downloadTankContentsFromSDCard(){
 
 
 void saveIngredientsFromCocktailsToSD(){
-  File ingredientsTxt = SD.open("ingred.txt");
+  File ingredientsTxt = SD.open(F("ingred.txt"));
   if(!ingredientsTxt){
     // if the file didn't open, print an error:
-    Serial.println("error opening ingred.txt");
-    state = "error";
+    Serial.println(F("error opening ingred.txt"));
+    state = F("error");
     return;
   }
 
-  Serial.println("saving Ingredients");
+  Serial.println(F("saving Ingredients"));
 
   for(int i = 0; i < maxNumOfCocktails; i++){
     if(cocktails[i].getName() == "") return;
 
     for(int j = 0; j < numOfTanks; j++){
       // open file for reading
-      ingredientsTxt = SD.open("ingred.txt");
+      ingredientsTxt = SD.open(F("ingred.txt"));
 
       String ingredient = cocktails[i].getIngredient(j).getName();
       if(ingredient == "") break;
@@ -2089,7 +2366,7 @@ void saveIngredientsFromCocktailsToSD(){
       // if not write it to that file
       if(!isInside){
         ingredientsTxt.close();
-        ingredientsTxt = SD.open("ingred.txt", FILE_WRITE);
+        ingredientsTxt = SD.open(F("ingred.txt"), FILE_WRITE);
         ingredientsTxt.print(ingredient + ",");
         ingredientsTxt.close();
       }
@@ -2100,25 +2377,30 @@ void saveIngredientsFromCocktailsToSD(){
 }
 
 void saveTankContentsToSD(String lastState){
-  File tankContentsTxt = SD.open("tanks.txt", FILE_WRITE | O_TRUNC);    // O_TRUNC deletes existing file content
+  File tankContentsTxt = SD.open(F("tanks.txt"), FILE_WRITE | O_TRUNC);    // O_TRUNC deletes existing file content
   if(!tankContentsTxt){
     // if the file didn't open, print an error:
-    Serial.println("error opening tanks.txt");
-    state = "error";
+    Serial.println(F("error opening tanks.txt"));
+    state = F("error");
     return;
   }
 
-  Serial.println("saving TankContents");
+  Serial.println(F("saving TankContents"));
 
   for(int i = 0; i < numOfTanks; i++){
     String ingredientName = cs.getTankContent(i);   //
     if(ingredientName == "") 
-      ingredientName == "leer";
+      ingredientName == F("leer");
     
     tankContentsTxt.print(ingredientName + "," + cs.getTankFillingLevel(i) + ",");
     
   }
   tankContentsTxt.print(lastState + ",");
+  tankContentsTxt.close();
+}
+
+void deleteTANKS_txt(){
+  File tankContentsTxt = SD.open(F("tanks.txt"), FILE_WRITE | O_TRUNC);    // O_TRUNC deletes existing file content
   tankContentsTxt.close();
 }
 
