@@ -140,7 +140,7 @@ const byte textChoiceSpacingY = 15;
 const int separatorLineX = 280;
 const int separatorLineWideX = 220;
 const byte separatorLineY = 80;
-const byte seperatorLineWideY = 115;
+const byte seperatorLineWideY = 145;
 const byte maxNumOfCharsPerLine = 37;
 const byte tankMarkToCl = 10;
 const byte printTanksWideX = 25;
@@ -739,6 +739,7 @@ void customCocktailMenu(){
         if(numIngredsCustomCocktail > 0){
           lastState = F("customCocktailMenu");
           confirmMakeCocktail(customCocktail);
+          return;
         }
         
         state = F("machineFilled");
@@ -762,6 +763,7 @@ void customCocktailMenu(){
           if(numIngredsCustomCocktail == numOfTanks || currentGlassCapacity == 0){
             lastState = F("customCocktailMenu");
             confirmMakeCocktail(customCocktail);
+            return;
           }
     
           return;
@@ -1624,7 +1626,7 @@ void cocktailDoneMenu(Cocktail cocktail){
   }
 }
 
-void ShotDoneMenu(Ingredient shotIngredient){
+void shotDoneMenu(Ingredient shotIngredient){
   mylcd.Fill_Screen(BLACK);
   resetGlobalVariables();
 
@@ -1893,7 +1895,7 @@ void makeShot(Ingredient shotIngredient){
   }
   
   // Shot done
-  ShotDoneMenu(shotIngredient);
+  shotDoneMenu(shotIngredient);
 }
 
 void deleteTankContents(){
