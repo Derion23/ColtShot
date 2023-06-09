@@ -1,87 +1,147 @@
-#include <AFMotor.h>
+
 //Parameter fuer HauptMotor
 #define HauptMotorGeschwindigkeit 128 //0-255 (PWM)
-#define delayTime 500 
+#define delayTime1 500 
 #define sensorPin A5
-#define NummerHauptMotor 1    //die Nummer der Motorschnittstelle auf Controll Board L298n
+#define ENA 9
+#define IN1 8
+#define IN2 7
 
-//Parameter fuer NemaMotor
-#define dirPin1 26  //Nema Motor für Rührer hoch und runterfahren
+//Parameter fuer NemaMotor(Ruehrer)
+#define dirPin1 26 
 #define stepPin1 27
-#define dirPin2 28  //Nema Motor für Rührer drehen
-#define stepPin2 29
 #define NemaMotor1Geschwindigkeit 2000  //je kleiner, desto schneller
-#define NemaMotor2Geschwindigkeit 2000  //je kleiner, desto schneller
+  //Diese Zahl bedeutet, die Zeit(microseconds) zwischen jedem Schritt
 #define NemaMotor1Drehwinkel 400 //720° drehen
-#define NemaMotor2Drehwinkel 800 //1440° drehen
    //fuer Stepper Motor: Jeder Step wird der Motor 1,8° drehen
-#define Verzoegerung 500
+#define Verzoegerung1 500
 
+//Parameter fuer NemaMotor(Ausloeser)
+#define dirPin2 28
+#define stepPin2 29
+#define NemaMotor2Geschwindigkeit 2000
+#define NemaMotor2Drehwinkel 400
+#define Verzoegerung2 5000
 
-AF_DCMotor HauptMotor(NummerHauptMotor);
+//Parameter fuer DCMotor (Ruehrer)
+#define dcGeschwindigkeit 128
+#define delayTime2 500
+#define ENB 6
+#define IN3 5
+#define IN4 4
+#define runTime 2000
+
+class DCMotor{
+  int EN,in1,in2;
+
+  public:
+  DCMotor(int a, int b, int c){
+    EN = a; in1 = b; in2 = c;
+    pinMode(EN,OUTPUT);
+    pinMode(in1,OUTPUT);
+    pinMode(in2,OUTPUT);
+  }
+  void setSpeed(int v){
+    analogWrite(EN,v);
+  }
+  void runClockwise(){
+    digitalWrite(in1, HIGH);
+    digitalWrite(in2,LOW);
+  }
+  void runCounterClockwise(){
+    digitalWrite(in1,LOW);
+    digitalWrite(in2,HIGH);
+  }
+  void stop(){
+    digitalWrite(in1,LOW);
+    digitalWrite(in2,LOW);
+  }
+};
+
+class StepperMotor{
+  int dirPin, stepPin;
+
+  public:
+  StepperMotor(int a, int b){
+    dirPin = a; stepPin = b;
+    pinMode(dirPin, OUTPUT);
+    pinMode(stepPin,OUTPUT);
+  }
+  void setDirection(int i){
+    if(i==0){ digitalWrite(dirPin, LOW); }   //clockwise
+    else{digitalWrite(dirPin,HIGH);}
+  }
+  void run(int winkel, int geschwindigkeit){
+    for(int x=0;x<winkel;x++){
+      digitalWrite(stepPin,HIGH);
+      delayMicroseconds(geschwindigkeit);
+      digitalWrite(stepPin,LOW);
+      delayMicroseconds(geschwindigkeit);
+    }
+  }
+};
+
+DCMotor HauptMotor(ENA, IN1, IN2);
+DCMotor DCMotor(ENB,IN3,IN4);
+StepperMotor RuehrerMotor(dirPin1, stepPin1);
+StepperMotor DosiererMotor(dirPin2, stepPin2);
 
 void setup() {
   // put your setup code here, to run once:
   Serial.begin(9600);
   HauptMotor.setSpeed(HauptMotorGeschwindigkeit);
-  pinMode(stepPin1,OUTPUT);
-  pinMode(stepPin2,OUTPUT);
-  pinMode(dirPin1,OUTPUT);
-  pinMode(dirPin2,OUTPUT);
-
-
+  DCMotor.setSpeed(dcGeschwindigkeit);
 }
 
 void loop() {
 }
 
+//Funktionen fuer Hauptmotor:
+
 void RotateClockwise(){
   bool Zustand = digitalRead(sensorPin);
   // HIGH, wenn nichts im Weg. LOW, wenn eine weisse Markierung auf der Flasche ist.
-  HauptMotor.run(FORWARD);
-  delay(delayTime); 
+  HauptMotor.runClockwise();
+  delay(delayTime1); 
   while(Zustand == 1){
-    HauptMotor.run(FORWARD);
+    HauptMotor.runClockwise();
   }
-  HauptMotor.run(RELEASE);
+  HauptMotor.stop();
 }
 
 void RotateCounterclockwise(){
   bool Zustand = digitalRead(sensorPin);
-  HauptMotor.run(BACKWARD);
-  delay(delayTime);
+  HauptMotor.runCounterClockwise();
+  delay(delayTime1);
   while(Zustand == 1){
-    HauptMotor.run(BACKWARD);
+    HauptMotor.runCounterClockwise();
   }
-  HauptMotor.run(RELEASE);
+  HauptMotor.stop();
 }
 
+//Funktion fuer Ruehrer
+
 void Ruehrer(){
-  digitalWrite(dirPin1,LOW);  //im Uhrzeigersinn einstellen
-  for(int x=0; x<NemaMotor1Drehwinkel; x++){
-    digitalWrite(stepPin1,HIGH);
-    delayMicroseconds(NemaMotor1Geschwindigkeit);
-    digitalWrite(stepPin1,LOW);
-    delayMicroseconds(NemaMotor1Geschwindigkeit);
-  }
-  delay(Verzoegerung);
+  RuehrerMotor.setDirection(0);
+  RuehrerMotor.run(NemaMotor1Drehwinkel, NemaMotor1Geschwindigkeit);
+  delay(Verzoegerung1);
 
-  digitalWrite(dirPin2,LOW);
-  for(int x=0;x<NemaMotor2Drehwinkel;x++){
-    digitalWrite(stepPin2,HIGH);
-    delayMicroseconds(NemaMotor2Geschwindigkeit);
-    digitalWrite(stepPin2,LOW);
-    delayMicroseconds(NemaMotor2Geschwindigkeit);
-  }
-
-  delay(Verzoegerung);
+  DCMotor.runClockwise();
+  delay(runTime);
+  DCMotor.stop();
+  delay(Verzoegerung1);
   
-  digitalWrite(dirPin1,HIGH); 
-  for(int x=0; x<NemaMotor1Drehwinkel; x++){
-    digitalWrite(stepPin1,HIGH);
-    delayMicroseconds(NemaMotor1Geschwindigkeit);
-    digitalWrite(stepPin1,LOW);
-    delayMicroseconds(NemaMotor1Geschwindigkeit);
-  }
+  RuehrerMotor.setDirection(1);
+  RuehrerMotor.run(NemaMotor1Drehwinkel,NemaMotor1Geschwindigkeit);
+}
 
+//Funktion fuer Dosierer
+void Dosierer(){
+  DosiererMotor.setDirection(0);
+  DosiererMotor.run(NemaMotor2Drehwinkel,NemaMotor2Geschwindigkeit);
+
+  delay(Verzoegerung2);
+
+  DosiererMotor.setDirection(1);
+  DosiererMotor.run(NemaMotor2Drehwinkel,NemaMotor2Geschwindigkeit);
 }
