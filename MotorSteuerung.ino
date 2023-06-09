@@ -25,7 +25,6 @@
 
 //Parameter fuer DCMotor (Ruehrer)
 #define dcGeschwindigkeit 128
-#define delayTime2 500
 #define ENB 6
 #define IN3 5
 #define IN4 4
@@ -82,15 +81,13 @@ class StepperMotor{
 };
 
 DCMotor HauptMotor(ENA, IN1, IN2);
-DCMotor DCMotor(ENB,IN3,IN4);
+DCMotor ruehrerDCMotor(ENB,IN3,IN4);
 StepperMotor RuehrerMotor(dirPin1, stepPin1);
 StepperMotor DosiererMotor(dirPin2, stepPin2);
 
 void setup() {
   // put your setup code here, to run once:
   Serial.begin(9600);
-  HauptMotor.setSpeed(HauptMotorGeschwindigkeit);
-  DCMotor.setSpeed(dcGeschwindigkeit);
 }
 
 void loop() {
@@ -99,6 +96,7 @@ void loop() {
 //Funktionen fuer Hauptmotor:
 
 void RotateClockwise(){
+  HauptMotor.setSpeed(HauptMotorGeschwindigkeit);
   bool Zustand = digitalRead(sensorPin);
   // HIGH, wenn nichts im Weg. LOW, wenn eine weisse Markierung auf der Flasche ist.
   HauptMotor.runClockwise();
@@ -110,6 +108,7 @@ void RotateClockwise(){
 }
 
 void RotateCounterclockwise(){
+  HauptMotor.setSpeed(HauptMotorGeschwindigkeit);
   bool Zustand = digitalRead(sensorPin);
   HauptMotor.runCounterClockwise();
   delay(delayTime1);
@@ -122,13 +121,15 @@ void RotateCounterclockwise(){
 //Funktion fuer Ruehrer
 
 void Ruehrer(){
+  ruehrerDCMotor.setSpeed(dcGeschwindigkeit);
+
   RuehrerMotor.setDirection(0);
   RuehrerMotor.run(NemaMotor1Drehwinkel, NemaMotor1Geschwindigkeit);
   delay(Verzoegerung1);
 
-  DCMotor.runClockwise();
+  ruehrerDCMotor.runClockwise();
   delay(runTime);
-  DCMotor.stop();
+  ruehrerDCMotor.stop();
   delay(Verzoegerung1);
   
   RuehrerMotor.setDirection(1);
