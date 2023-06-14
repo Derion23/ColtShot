@@ -145,7 +145,7 @@ const byte maxNumOfCharsPerLine = 37;
 const byte tankMarkToCl = 10;
 const byte printTanksWideX = 25;
 const byte maxGlassCapacity = 30;     // a Cocktail has to be smaller than that capacity
-const byte maxAmountPerIngredient = 20;
+const byte maxAmountPerIngredient = 30;
 const byte shotSize = 2;
 const byte maxRandomNum = 3; // exclusive, determines probability in Game
 
@@ -763,9 +763,10 @@ void customCocktailMenu(){
           if(numIngredsCustomCocktail == numOfTanks || currentGlassCapacity == 0){
             lastState = F("customCocktailMenu");
             confirmMakeCocktail(customCocktail);
+            state = F("machineFilled");
             return;
           }
-    
+          
           return;
         }
 
@@ -1193,7 +1194,8 @@ void emptyTankMenu(int tankIndex){
       focus();
 
       if(isOkButtonPressed()){
-        cs.withdraw(tankIndex, min(cs.getTankFillingLevel(tankIndex), currentGlassCapacity));
+        // one extra 2cl dispense
+        cs.withdraw(tankIndex, min(cs.getTankFillingLevel(tankIndex) + 2, currentGlassCapacity));
         break;
       }
     }
@@ -1232,8 +1234,8 @@ void getCustomCocktailAmount(){
       }
       
       // index is amount
-      customCocktail.setIngredientAmount(numIngredsCustomCocktail - 1, index);
-      currentGlassCapacity -= index;
+      customCocktail.setIngredientAmount(numIngredsCustomCocktail - 1, index * 2);
+      currentGlassCapacity -= index * 2;
       return;
     }
   }
@@ -1249,7 +1251,7 @@ void printGetCustomCocktailAmount(){
     addSpacingY(textChoiceSpacingY);
   }
 
-  for(int i = 1; i <= min(maxAmountPerIngredient, currentGlassCapacity); i++){
+  for(int i = 2; i <= min(maxAmountPerIngredient, currentGlassCapacity); i += 2){
     printChoiceToPages(String(i));
   }
 
@@ -1536,8 +1538,10 @@ void confirmMakeCocktail(Cocktail cocktail){
     if(isOkButtonPressed()){
       if(focusedChoice == 0){
         makeCocktail(cocktail);
+        return;
       }
       
+
       return;
     }
   }
@@ -2219,8 +2223,10 @@ void downloadCocktailsFromSD(){
         amountStr += currentChar;
       }
 
+      byte amount = amountStr.toInt() % 2 == 1 ? amountStr.toInt() + 1 : amountStr.toInt();
+
       // Save Ingredient
-      ingredients[j] = Ingredient(nameOfIngredient, amountStr.toInt());
+      ingredients[j] = Ingredient(nameOfIngredient, amount);
       if(j != numOfTanks - 1)
         ingredients[j + 1] = Ingredient();
     }
