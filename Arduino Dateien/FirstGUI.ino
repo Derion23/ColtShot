@@ -10,6 +10,7 @@ const byte numOfTanks = 6;
 byte numOfEmptyTanks = numOfTanks;
 byte currentTankIndex = 0;
 void saveTankContentsToSD(String lasState);
+void withdrawMOTOR(byte amount);
 
 // CLASSES
 class Ingredient{
@@ -35,9 +36,11 @@ class Cocktail{
   private:
     String name;
     Ingredient ingredients[numOfTanks];
-    bool mix = false;
+    
 
   public:
+    bool mix = false;
+
     Cocktail(){this->name = "";}
 
     Cocktail(String name, Ingredient ingredients[numOfTanks], bool mix){
@@ -113,6 +116,7 @@ class ColtShot{
 
     void withdraw(int index, int amount){
       this->tanks[index].fillTo(this->tanks[index].getFillingLevel() - amount);
+      withdrawMOTOR(amount);
     }
 
     void fillTankToSetup(int index, int fillingLevel){
@@ -499,6 +503,7 @@ void confirmGoingBack(){
         state = lastState;
       } else if(focusedChoice == 1){
         deleteTankContents();
+        moveToPositionMOTOR(0);
         state = secondLastState;
       }
 
@@ -585,9 +590,11 @@ void fillTanks(){
       if(currentTankIndex == numOfTanks - 1){
         state = F("masterOverview");
         currentTankIndex = 0;
+        moveToPositionMOTOR(0);
         return;
       }
       currentTankIndex++;
+      moveClockwiseMOTOR();
       return;
     } else if(isBackButtonPressed()){
       lastState = F("fillTanks");
@@ -1859,8 +1866,11 @@ void makeCocktail(Cocktail cocktail){
     }
   }
 
+  moveToPositionMOTOR(0);
+
   // MAKE COCKTAIL
-  // loop through ingredients
+  // loop through ingredients 
+  /*
   for(int i = 0; i < numOfTanks; i++){
     Ingredient ingredient = cocktail.getIngredient(i);
     if(ingredient.getName() == "") break;
@@ -1869,9 +1879,33 @@ void makeCocktail(Cocktail cocktail){
       if(cs.getTankContent(j) != ingredient.getName()) continue;
 
       cs.withdraw(j, ingredient.getAmount());
-      // MOVE MACHINE
+
+    }
+  }*/
+
+  // loop through tanks
+  for(int i = 0; i < numOfTanks; i++){
+    moveClockwiseMOTOR();
+    // loop through ingredients of Cocktail
+    for(int j = 0;  j < numOfTanks; j++){
+      Ingredient ingredient = cocktail.getIngredient(j);
+      if(ingredient.getName() == "") break;
+      if(cs.getTankContent(i) != ingredient.getName()) continue;
+
+      cs.withdraw(j, ingredient.getAmount());
+      break;
     }
   }
+
+  // Mixen
+  if(cocktail.mix == true){
+    // Mixer
+    moveToPositionMOTOR(7);
+    mixMOTOR();
+  }
+
+  // MOVE BACK
+  moveToPositionMOTOR(0);
 
   // Cocktail done
   cocktailDoneMenu(cocktail);
@@ -1898,8 +1932,11 @@ void makeShot(Ingredient shotIngredient){
     if(cs.getTankContent(j) != shotIngredient.getName()) continue;
     cs.withdraw(j, shotIngredient.getAmount());
     // MOVE MACHINE
+    if(j != numOfTanks - 1)
+      moveClockwiseMOTOR();
   }
   
+  moveToPositionMOTOR(0);
   // Shot done
   shotDoneMenu(shotIngredient);
 }
@@ -2415,6 +2452,35 @@ void deleteTANKS_txt(){
 }
 
 
+// MOTOR FUNCTIONS
+void moveClockwiseMOTOR(){
+  currentTankIndex++;
+}
+
+void moveCounterClockwiseMOTOR(){
+  currentTankIndex--;
+}
+
+void withdrawMOTOR(byte amount){
+  for(byte i = 0; i < amount / 2; i++){
+    // press auslöser
+  }
+}
+
+void mixMOTOR(){
+
+}
+
+// MOTOR Helper Functions
+void moveToPositionMOTOR(byte pos){
+  while(currentTankIndex > pos){
+    moveCounterClockwiseMOTOR();
+  }
+
+  while(currentTankIndex < pos){
+    moveClockwiseMOTOR();
+  }
+}
 
 
 
