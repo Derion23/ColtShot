@@ -140,7 +140,7 @@ const byte textChoiceSpacingY = 15;
 const int separatorLineX = 280;
 const int separatorLineWideX = 220;
 const byte separatorLineY = 80;
-const byte seperatorLineWideY = 145;
+const byte seperatorLineWideY = 170;
 const byte maxNumOfCharsPerLine = 37;
 const byte tankMarkToCl = 10;
 const byte printTanksWideX = 25;
@@ -312,7 +312,7 @@ void start(){
   numOfChoices = 2;
 
   print(F("Waehle eine der folgenden Moeglich-"));
-  print(F("keiten die Maschine zu befuellen:"));
+  print(F("keiten, die Maschine zu befuellen:"));
   addSpacingY(textChoiceSpacingY);
   printChoice(F("Cocktails auswaehlen"));
   printChoice(F("Zutaten auswaehlen"));
@@ -562,9 +562,10 @@ void fillTanks(){
   }
   mylcd.Fill_Screen(BLACK);
   resetGlobalVariables();
-  print(F("Fuelle den Tank direkt ueber dem Glas"));
-  print("mit " + ingredient + ".");
-  print(F("Gefuellt bis zur Markierung:"));
+  print(F("Fuelle den Tank direkt ueber der"));
+  print("Ausgabeoeffnung mit " + ingredient + ".");
+  print(F("Waehle die Markierung, bis zu welcher"));
+  print(F("du den Tank gefuellt hast:"));
   numOfChoices = 5;
   addSpacingY(textChoiceSpacingY);
   printChoice(F("1"));
@@ -642,9 +643,9 @@ void machineFilled(){
 
   numOfChoices = 4;
   addSpacingY(textChoiceSpacingY);
-  printChoice(F("Cocktails auswaehlen"));
+  printChoice(F("Cocktail auswaehlen"));
   printChoice(F("Persoenlicher Cocktail"));
-  printChoice(F("Spielmodus"));
+  printChoice(F("Russian Roulette"));
   printChoice(F("Tanks nachfuellen"));
 
   while(true){
@@ -676,7 +677,7 @@ void cocktailSelection(){
 
   updateAvailableCocktails();
 
-  print(F("Waehle einen der folgenden Cocktails"));
+  print(F("Waehle einen der folgenden Cocktails:"));
 
   addSpacingY(textChoiceSpacingY);
   printChoice(F("Zurueck"));
@@ -739,7 +740,6 @@ void customCocktailMenu(){
         if(numIngredsCustomCocktail > 0){
           lastState = F("customCocktailMenu");
           confirmMakeCocktail(customCocktail);
-          return;
         }
         
         state = F("machineFilled");
@@ -789,7 +789,7 @@ void gameMenu(){
       if(focusedChoice == 0){
         state = F("machineFilled");
         return;
-      } // "Spiel staten" option
+      } // "Spiel starten" option
       else if(focusedChoice == numOfChoices - 1 && numOfIngredsGame > 0){
         state = F("game");
         return;
@@ -826,13 +826,13 @@ void game(){
   mylcd.Fill_Screen(BLACK);
   resetGlobalVariables();
 
-  print(F("Spielmodus"));
+  print(F("Russian Roulette"));
   addSpacingY(textChoiceSpacingY);
-  print(F("Druecke nun den Abzug"));
+  print(F("Traust du dich, den Abzug zu druecken?"));
 
   numOfChoices = 2;
   addSpacingY(textChoiceSpacingY);
-  printChoice(F("Abzug"));
+  printChoice(F("Abzug druecken"));
   printChoice(F("Spiel abbrechen"));
 
   while(true){
@@ -856,7 +856,7 @@ void refillTanks(){
   mylcd.Fill_Screen(BLACK);
   resetGlobalVariables();
 
-  print(F("Waehle den Tank der nachgefuellt wird"));
+  print(F("Welcher Tank soll nachgefuellt werden?"));
 
   addSpacingY(textChoiceSpacingY);
   printChoice(F("Zurueck"));
@@ -1285,7 +1285,7 @@ void printCustomCocktailMenu(){
 void printGameMenu(){
   mylcd.Fill_Screen(BLACK);
 
-  print(F("Willkommen im Spielmodus!"));
+  print(F("Willkommen zu Russian Roulette!"));
   addSpacingY(textChoiceSpacingY);
   print(F("Waehle zuerst Zutaten fuer die Shots:"));
   addSpacingY(textChoiceSpacingY);
@@ -1321,12 +1321,13 @@ void printGameResult(){
 }
 
 void printShotReceived(){
-  print(F("Spielmodus"));
+  print(F("Russian Roulette"));
   addSpacingY(textChoiceSpacingY);
 
   int randomNum = random(numOfIngredsGame);
   Ingredient shotIngredient = chosenIngredientsGame[randomNum];
-  print(F("Pech gehabt, du bekommst einen Shot:"));
+  print(F("PENG!"));
+  print("Pech gehabt, du bekommst einen Shot:");
   addSpacingY(textChoiceSpacingY);
   print(shotIngredient.getName());
 
@@ -1352,9 +1353,9 @@ void printShotReceived(){
 }
 
 void printNoShotReceived(){
-  print(F("Spielmodus"));
+  print(F("Russian Roulette"));
   addSpacingY(textChoiceSpacingY);
-  print(F("Glueck gehabt!"));
+  print(F("Click... Glueck gehabt!"));
 
   addSpacingY(textChoiceSpacingY);
   numOfChoices = 1;
@@ -1591,7 +1592,7 @@ void printAvailableCocktails(){
       availableCocktailsStr += ", " + availableCocktailsArr[i];
     } else{
       // print a new line with these Cocktails
-      print(availableCocktailsStr);
+      print(availableCocktailsStr + ",");
 
       currentStringLength = addedLength - 2;
       availableCocktailsStr = availableCocktailsArr[i];
@@ -1664,7 +1665,8 @@ void refillTank(int tankIndex){
   print("Aktueller Fuellstand: " + String(tankFillingLevel) + "cl");
 
   addSpacingY(textChoiceSpacingY);
-  print("Gefuellt bis zur Markierung:");
+  print(F("Waehle die Markierung, bis zu welcher"));
+  print(F("du den Tank gefuellt hast:"));
   addSpacingY(textChoiceSpacingY);
 
   numOfChoices = 0;
@@ -1727,7 +1729,7 @@ void printTankContents(){
       tankContentsStr += ", " + newIngredientStr;
     } else{
       // print a new line with these Ingredients
-      print(tankContentsStr);
+      print(tankContentsStr + ",");
 
       currentStringLength = addedLength - 2;
       tankContentsStr = cs.getTankContent(i);
@@ -2405,7 +2407,6 @@ void deleteTANKS_txt(){
   File tankContentsTxt = SD.open(F("tanks.txt"), FILE_WRITE | O_TRUNC);    // O_TRUNC deletes existing file content
   tankContentsTxt.close();
 }
-
 
 
 
