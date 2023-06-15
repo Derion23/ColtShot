@@ -6,7 +6,7 @@
 // MOTOR VARIABLES
 //Parameter fuer mainMotor
 #define mainMotorSpeed 180 //0-255 (PWM)
-#define mainMotorDelayTime 500 
+#define mainMotorDelayTime 600 
 #define sensorPin1 30
 #define sensorPin2 31
 #define enableA 45
@@ -18,14 +18,14 @@
 #define stepPin1 26
 #define stirNemaMotorDelay 700  //je kleiner, desto schneller
   //Diese Zahl bedeutet, die Zeit(microseconds) zwischen jedem Schritt
-#define stirNemaMotorAngle 2900  
+#define stirNemaMotorAngle 3000  
    //fuer Stepper Motor: Jeder Step wird der Motor 1,8° drehen
 #define stirDelay 500
 
 //Parameter fuer NemaMotor(Ausloeser)
 #define dirPin2 28
 #define stepPin2 29
-#define dispenserNemaMotorDelay 300
+#define dispenserNemaMotorDelay 600
 #define dispenserNemaMotorAngle 2000
 #define dispenserDelay 3000
 #define reloadDoserDelay 2000
@@ -218,8 +218,8 @@ class StepperMotor{
 };
 
 // CONSTANTS
-const byte maxNumOfCocktails = 20;
-const byte maxNumOfIngredients = 40;
+const byte maxNumOfCocktails = 30;
+const byte maxNumOfIngredients = 60;
 
 const byte textPaddingX = 10;
 const byte textPaddingY = 10;
