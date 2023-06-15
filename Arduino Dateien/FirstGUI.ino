@@ -3,6 +3,40 @@
 #include <SD.h>   // libraries for SD card
 #include <SPI.h>
 
+// MOTOR VARIABLES
+//Parameter fuer mainMotor
+#define mainMotorSpeed 180 //0-255 (PWM)
+#define mainMotorDelayTime 500 
+#define sensorPin1 30
+#define sensorPin2 31
+#define enableA 45
+#define MainMotorInput1 40
+#define MainMotorInput2 41
+
+//Parameter fuer NemaMotor(Stirrer)
+#define dirPin1 27
+#define stepPin1 26
+#define stirNemaMotorDelay 700  //je kleiner, desto schneller
+  //Diese Zahl bedeutet, die Zeit(microseconds) zwischen jedem Schritt
+#define stirNemaMotorAngle 2900  
+   //fuer Stepper Motor: Jeder Step wird der Motor 1,8° drehen
+#define stirDelay 500
+
+//Parameter fuer NemaMotor(Ausloeser)
+#define dirPin2 28
+#define stepPin2 29
+#define dispenserNemaMotorDelay 300
+#define dispenserNemaMotorAngle 2000
+#define dispenserDelay 3000
+#define reloadDoserDelay 2000
+
+//Parameter fuer DCMotor (Stirrer)
+#define stirDCSpeed 30
+#define enableB 44
+#define input3 42
+#define input4 43
+#define runTime 2000
+
 LCDWIKI_KBV mylcd(ILI9486,A3,A2,A1,A0,A4); //model,cs,cd,wr,rd,reset
 
 // CLASSES VARIABLES AND FUNCTIONS
@@ -127,9 +161,65 @@ class ColtShot{
     int getTankFillingLevel(int index){ return this->tanks[index].getFillingLevel();}
   };
 
+// MOTOR CLASSES
+class DCMotor{
+  int enablePin,input1,input2;
+
+  public:
+  DCMotor(int enablePin, int input1, int input2){
+    this->enablePin = enablePin; this->input1 = input1; this->input2 = input2;
+    pinMode(enablePin,OUTPUT);
+    pinMode(input1,OUTPUT);
+    pinMode(input2,OUTPUT);
+    digitalWrite(input1,LOW);
+    digitalWrite(input2,LOW);
+  }
+  void setSpeed(int v){
+    analogWrite(enablePin,v);
+  }
+  void runClockwise(){
+    digitalWrite(input1, HIGH);
+    digitalWrite(input2,LOW);
+  }
+  void runCounterClockwise(){
+    digitalWrite(input1,LOW);
+    digitalWrite(input2,HIGH);
+  }
+  void stop(){
+    digitalWrite(input1,LOW);
+    digitalWrite(input2,LOW);
+  }
+};
+
+class StepperMotor{
+  int dirPin, stepPin;
+
+  public:
+  StepperMotor(int a, int b){
+    dirPin = a; stepPin = b;
+    pinMode(dirPin, OUTPUT);
+    pinMode(stepPin,OUTPUT);
+    digitalWrite(stepPin,LOW);
+    digitalWrite(dirPin,LOW);
+  }
+  void setDirection(int i){
+    if(i==0){ digitalWrite(dirPin, LOW); }   //clockwise
+    else{digitalWrite(dirPin,HIGH);}
+  }
+  
+  void run(int angle, int delaytime){
+    for(int x=0;x<angle;x++){
+      digitalWrite(stepPin,HIGH);
+      delayMicroseconds(delaytime);
+      digitalWrite(stepPin,LOW);
+      delayMicroseconds(delaytime);
+    }
+  }
+};
+
 // CONSTANTS
-const byte maxNumOfCocktails = 30;
-const byte maxNumOfIngredients = 60;
+const byte maxNumOfCocktails = 20;
+const byte maxNumOfIngredients = 40;
 
 const byte textPaddingX = 10;
 const byte textPaddingY = 10;
@@ -207,6 +297,12 @@ int delayOfDebounceTurn = 200;
 long timeOfLastDebouncePress = 0;
 int delayOfDebouncePress = 750;
 
+// MOTORS
+DCMotor mainMotor(enableA, MainMotorInput1, MainMotorInput2);
+DCMotor StirrerDCMotor(enableB,input3,input4);
+StepperMotor RuehrerMotor(dirPin1, stepPin1);
+StepperMotor DosiererMotor(dirPin2, stepPin2);
+
 
 // DEFINITIONS
 #define BLACK   0x0000
@@ -225,6 +321,7 @@ void setup() {
   pinMode(pinDT, INPUT_PULLUP);
   pinMode(pinCLK, INPUT_PULLUP);
   pinMode(pinOkBTN, INPUT_PULLUP);
+  pinMode(pinBackBTN, INPUT_PULLUP);
   previousClkState = digitalRead(pinCLK);
 
   // setupSD Card
@@ -261,6 +358,22 @@ void setup() {
 
   // RANDOM - randomSeed() will then shuffle the random function.
   randomSeed(analogRead(0));
+
+  // MOTOR SETUP
+  pinMode(sensorPin1,INPUT);
+  pinMode(sensorPin2,INPUT);
+
+  // set Motor pins to zero
+  pinMode(26,OUTPUT);   digitalWrite(26, LOW);
+  pinMode(27,OUTPUT);   digitalWrite(27, LOW);
+  pinMode(28,OUTPUT);   digitalWrite(28, LOW);
+  pinMode(29,OUTPUT);   digitalWrite(29, LOW);
+  pinMode(44,OUTPUT);   digitalWrite(44, LOW);
+  pinMode(45,OUTPUT);   digitalWrite(45, LOW);
+
+  //drive stirrer one revolution up, because it is falling down on setup
+  RuehrerMotor.setDirection(1);
+  RuehrerMotor.run(200, 600); // angle, delay
 
   Serial.println(F("Program started..."));
 }
@@ -303,6 +416,8 @@ void loop() {
     emptyTanksMenu();
   else if(state == F("cleaningMenu"))
     cleaningMenu();
+  else if(state == F("moveTanksMenu"))
+    moveTanksMenu();
   else if(state == F("error"))
     error();
 }
@@ -330,6 +445,11 @@ void start(){
       else if(focusedChoice == 1)
         state = F("addIngredients");
         
+      return;
+    }
+    else if(isBackButtonPressed()){
+      lastState = F("start");
+      state = F("moveTanksMenu");
       return;
     }
   }
@@ -589,17 +709,12 @@ void fillTanks(){
 
       if(currentTankIndex == numOfTanks - 1){
         state = F("masterOverview");
-        currentTankIndex = 0;
         moveToPositionMOTOR(0);
         return;
       }
-      currentTankIndex++;
+
+      motorMovingMenu();
       moveClockwiseMOTOR();
-      return;
-    } else if(isBackButtonPressed()){
-      lastState = F("fillTanks");
-      secondLastState = F("start");
-      state = F("confirmGoingBack");
       return;
     }
   }
@@ -918,9 +1033,10 @@ void questionEmptyTanks(){
   print(F("Sollen alle Tanks geleert werden?"));
   addSpacingY(textChoiceSpacingY);
 
-  numOfChoices = 2;
+  numOfChoices = 3;
   printChoice(F("Ja, alle Tanks leeren"));
   printChoice(F("Abbrechen"));
+  printChoice(F("Tanks bewegen (MASTER)"));
   
   printTankContentsWithAmountsBoxed();
 
@@ -933,6 +1049,10 @@ void questionEmptyTanks(){
         state = F("emptyTanksGlassSize");
       else if(focusedChoice == 1)
         state = F("machineFilled");
+      else if(focusedChoice == 2){
+        lastState = "machineFilled";
+        state = F("moveTanksMenu");
+      }
 
       return;
     }
@@ -1036,6 +1156,40 @@ void cleaningMenu(){
   }
 }
 
+void moveTanksMenu(){
+  mylcd.Fill_Screen(BLACK);
+  resetGlobalVariables();
+
+  print(F("Tanks bewegen?"));
+
+  numOfChoices = 3;
+  addSpacingY(textChoiceSpacingY);
+  printChoice("Abbrechen");
+  printChoice("Tank im Uhrzeigersinn");
+  printChoice("Tank gegen Uhrzeigersinn");
+
+  while(true){
+    focusedChoice = getTurnKnobIndex();
+    focus();
+
+    if(isOkButtonPressed()){
+      if(focusedChoice == 0){
+        state = lastState;
+        return;
+      } else if(focusedChoice == 1){
+        motorMovingMenu();
+        moveClockwiseMOTOR();
+      } else if(focusedChoice == 2){
+        motorMovingMenu();
+        moveCounterClockwiseMOTOR();
+      }
+
+      currentTankIndex = 0;
+      return;
+    }
+  }
+}
+
 void error(){
   resetGlobalVariables();
   mylcd.Fill_Screen(BLACK);
@@ -1084,6 +1238,13 @@ void knobTurn(){
 
 
 // MENU PRINT FUNCTIONS
+void motorMovingMenu(){
+  mylcd.Fill_Screen(BLACK);
+  resetGlobalVariables();
+  print(F("Motoren bewegen sich..."));
+  print(F("bitte warten"));
+}
+
 void fillTanksWithCleaningFluid(){
   // HWCMD: MOVE1
   currentTankIndex = 0;
@@ -1883,24 +2044,39 @@ void makeCocktail(Cocktail cocktail){
     }
   }*/
 
+  // determine num of Ingredients
+  //byte numOfIngreds = 0;
+  //for(byte i = 0; i < numOfTanks; i++){
+  //  if(cocktail.getIngredient(i).getName() == "") break;
+  //  numOfIngreds++;
+  //}
+
+  byte dispensedIngreds = 0;
+
   // loop through tanks
   for(int i = 0; i < numOfTanks; i++){
-    moveClockwiseMOTOR();
     // loop through ingredients of Cocktail
     for(int j = 0;  j < numOfTanks; j++){
+
       Ingredient ingredient = cocktail.getIngredient(j);
       if(ingredient.getName() == "") break;
       if(cs.getTankContent(i) != ingredient.getName()) continue;
 
-      cs.withdraw(j, ingredient.getAmount());
+      cs.withdraw(i, ingredient.getAmount());
+      
       break;
+    }
+
+    if(i != numOfTanks - 1){
+      motorMovingMenu();
+      moveClockwiseMOTOR();
     }
   }
 
   // Mixen
   if(cocktail.mix == true){
     // Mixer
-    moveToPositionMOTOR(7);
+    moveToPositionMOTOR(6);
     mixMOTOR();
   }
 
@@ -1932,8 +2108,10 @@ void makeShot(Ingredient shotIngredient){
     if(cs.getTankContent(j) != shotIngredient.getName()) continue;
     cs.withdraw(j, shotIngredient.getAmount());
     // MOVE MACHINE
-    if(j != numOfTanks - 1)
+    if(j != numOfTanks - 1){
+      motorMovingMenu();
       moveClockwiseMOTOR();
+    }
   }
   
   moveToPositionMOTOR(0);
@@ -2454,25 +2632,74 @@ void deleteTANKS_txt(){
 
 // MOTOR FUNCTIONS
 void moveClockwiseMOTOR(){
+  Serial.println("Move Clockwise");
+
+  mainMotor.setSpeed(mainMotorSpeed);
+  // HIGH, wenn nichts im Weg. LOW, wenn eine weisse Markierung auf der Flasche ist.
+  mainMotor.runClockwise();
+  delay(mainMotorDelayTime); 
+  while(true){
+    if(digitalRead(sensorPin1)==0 && digitalRead(sensorPin2)==0) break;
+  }
+  mainMotor.stop();
+
   currentTankIndex++;
 }
 
 void moveCounterClockwiseMOTOR(){
+  Serial.println(F("Move CounterClockwise"));
+
+  mainMotor.setSpeed(mainMotorSpeed);
+  mainMotor.runCounterClockwise();
+  delay(mainMotorDelayTime);
+  while(true){
+    if(digitalRead(sensorPin1)==0 && digitalRead(sensorPin2)==0) break;
+  }
+  mainMotor.stop();
+
   currentTankIndex--;
 }
 
 void withdrawMOTOR(byte amount){
   for(byte i = 0; i < amount / 2; i++){
+    Serial.println(F("Withdraw 2cl"));
+
     // press auslöser
+    DosiererMotor.setDirection(1);
+    DosiererMotor.run(dispenserNemaMotorAngle,dispenserNemaMotorDelay);
+
+    delay(dispenserDelay);
+
+    DosiererMotor.setDirection(0);
+    DosiererMotor.run(dispenserNemaMotorAngle,dispenserNemaMotorDelay);
+
+    if(i != (amount / 2) - 1){
+      delay(reloadDoserDelay);
+    }
   }
 }
 
 void mixMOTOR(){
+  Serial.println(F("Mix Cocktail"));
+  motorMovingMenu();
 
+  StirrerDCMotor.setSpeed(stirDCSpeed);
+  RuehrerMotor.setDirection(0);
+  RuehrerMotor.run(stirNemaMotorAngle, stirNemaMotorDelay);
+  delay(stirDelay);
+
+  StirrerDCMotor.runClockwise();
+  delay(runTime);
+  StirrerDCMotor.stop();
+  delay(stirDelay);
+  
+  RuehrerMotor.setDirection(1);
+  RuehrerMotor.run(stirNemaMotorAngle,stirNemaMotorDelay);
 }
 
 // MOTOR Helper Functions
 void moveToPositionMOTOR(byte pos){
+  motorMovingMenu();
   while(currentTankIndex > pos){
     moveCounterClockwiseMOTOR();
   }
